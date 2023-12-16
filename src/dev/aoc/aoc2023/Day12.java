@@ -3,23 +3,23 @@ package dev.aoc.aoc2023;
 import com.google.common.primitives.Chars;
 import com.google.common.primitives.Ints;
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
 import org.javatuples.Pair;
 import org.junit.jupiter.api.Test;
 
-import java.nio.CharBuffer;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class Day12 extends Day {
-    public Day12(String inputSuffix) {
-        super(inputSuffix);
+    public static void main(String[] args) {
+        Day.run(() -> new Day12("")); //_sample, _small2, _test_trimming
     }
 
-    public static void main(String[] args) {
-        new Day12("").run(); // _small, _small2, _test_trimming
+    public Day12(String inputSuffix) {
+        super(inputSuffix);
     }
 
     private interface ISpringsLineParse {
@@ -97,7 +97,7 @@ public class Day12 extends Day {
 
     private static final class SpringsLineSolverContext {
         private final ISpringsLineParse springsLineParse;
-        private Map<Pair<Integer, Integer>, Long> resultsCache;
+        private final Map<Pair<Integer, Integer>, Long> resultsCache;
         private final int[] maxGroupLength;
         private final int[] groupsWithSepRestLength;
 
@@ -181,16 +181,16 @@ public class Day12 extends Day {
         return countArrangements(new SpringsLineSolverContext(springsLineParse), 0, 0);
     }
 
-    @Override
-    protected void parsePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
         springsLineParse1 = stream()
                 .map(SpringsLineParsePart1::new)
                 .toList()
                 ;
     }
 
-    @Override
-    protected Object solvePart1() {
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         long result = springsLineParse1.stream()
                 // .parallel()
                 // .peek(slp -> System.out.printf("%d: %s%n", springsLineParse1.indexOf(slp), slp.toStringLong()))
@@ -201,16 +201,16 @@ public class Day12 extends Day {
         return result;
     }
 
-    @Override
-    protected void parsePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
         springsLineParse2 = stream()
                 .map(SpringsLineParsePart2::new)
                 .toList()
         ;
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         long result = springsLineParse2.stream()
                 // .parallel()
                 // .peek(slp -> System.out.println(slp.toStringLong()))
@@ -223,8 +223,8 @@ public class Day12 extends Day {
 
     public static class Day12Test {
         @Test
-        void solvePart1_small() {
-            var day = new Day12("_small");
+        void solvePart1_sample() {
+            var day = new Day12("_sample");
             day.parsePart1();
             assertEquals(21L, day.solvePart1());
         }
@@ -237,8 +237,8 @@ public class Day12 extends Day {
         }
 
         @Test
-        void solvePart2_small() {
-            var day = new Day12("_small");
+        void solvePart2_sample() {
+            var day = new Day12("_sample");
             day.parsePart2();
             assertEquals(525152L, day.solvePart2());
         }

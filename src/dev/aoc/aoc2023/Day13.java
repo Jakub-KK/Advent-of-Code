@@ -1,6 +1,8 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
 import org.javatuples.Pair;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +16,13 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class Day13 extends Day {
+    public static void main(String[] args) {
+        // uses const RNG seed for repeatability for speed tests
+        Day.run(() -> new Day14("")); // _small2, _small3
+    }
+
     private final boolean doEnlargeInput;
+
     private final int enlargeToMinSide;
 
     public Day13(String inputSuffix) {
@@ -30,11 +38,6 @@ public class Day13 extends Day {
         this.doEnlargeInput = doEnlargeInput;
         this.enlargeToMinSide = enlargeToMinSide;
         rng = new Random(rngSeed);
-    }
-
-    public static void main(String[] args) {
-        // uses const RNG seed for repeatability for speed tests
-        new Day13("_small", false).run(); // _small, _small2
     }
 
     /** Cache for results of finding mirrors without smudge, will be used in finding mirrors with smudge later */
@@ -284,8 +287,8 @@ public class Day13 extends Day {
 
     private List<Pattern> patterns, patternsTransposed;
 
-    @Override
-    protected void parsePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
         patterns = stream().reduce(
                 new ArrayList<>(),
                 (list, line) -> {
@@ -329,8 +332,8 @@ public class Day13 extends Day {
         ;
     }
 
-    @Override
-    protected Object solvePart1() {
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         // if (true)return 0;
         long resultV = patterns.stream()
                 // .parallel()
@@ -360,12 +363,13 @@ public class Day13 extends Day {
         return 100 * resultV + resultH;
     }
 
-    @Override
-    protected void parsePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        parsePart1();
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         // if (true)return 0;
         long resultV = patterns.stream()
                 // .parallel()
@@ -405,8 +409,8 @@ public class Day13 extends Day {
             assertEquals(countWithSmudge, pattern.findMirrorsWithSmudge());
         }
         @Test
-        void solvePart1_small() {
-            var day = new Day13("_small");
+        void solvePart1_sample() {
+            var day = new Day13("_sample");
             day.parsePart1();
             assertEquals(405L, day.solvePart1());
         }
@@ -418,8 +422,8 @@ public class Day13 extends Day {
             assertEquals(33195L, day.solvePart1());
         }
         @Test
-        void solvePart2_small() {
-            var day = new Day13("_small");
+        void solvePart2_sample() {
+            var day = new Day13("_sample");
             day.parsePart1();
             day.parsePart2();
             assertEquals(400L, day.solvePart2());

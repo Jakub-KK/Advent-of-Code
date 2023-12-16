@@ -5,6 +5,8 @@ import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
 import org.junit.jupiter.api.Test;
 
 import java.nio.CharBuffer;
@@ -16,12 +18,18 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class Day14 extends Day {
-    public Day14(String inputSuffix) {
-        super(inputSuffix);
+    public static void main(String[] args) {
+        // _longcycle_2520 (source: https://old.reddit.com/r/adventofcode/comments/18i45eo/2023_day_14_part_2_worst_case_complexity/)
+        // _longcycle_5 (cycle of length 5 extracted from _longcycle_2520)
+        // _longcycle_85085_5x7x11x13x17 (based on _longcycle_2520, modified for compactness)
+        // _longcycle_85085_5x7x11x13x17_filled (_longcycle_85085_5x7x11x13x17 filled with square stones '#' to speed up processing)
+        // _longcycle_870870_2x3x5x7x11x13x29 (source: https://old.reddit.com/r/adventofcode/comments/18i45eo/2023_day_14_part_2_worst_case_complexity/kdfxrus/)
+        // _longcycle_13082761331670030_43x41x37x31x29x23x19x17x13x11x7x5x3x2 (source: https://old.reddit.com/r/adventofcode/comments/18it12w/2023_day_14_part_2_custom_worst_case_testcase/)
+        Day.run(() -> new Day14("")); // _sample
     }
 
-    public static void main(String[] args) {
-        new Day14("_longcycle_85085_5x7x11x13x17").run(); // _sample, _longcycle_85085_5x7x11x13x17, _longcycle_5, _longcycle_2520
+    public Day14(String inputSuffix) {
+        super(inputSuffix);
     }
 
     private static final HashFunction hashSHA256 = Hashing.sha256();
@@ -31,8 +39,10 @@ public class Day14 extends Day {
         private final int width;
         private final int height;
 
-        private int[][] nonSquareRangesForRows;
-        private int[][] nonSquareRangesForCols;
+        /** Array of ranges of non-square stones in the rows on the map (length is 2 * count of ranges). Speeds up round stones rolling. */
+        private final int[][] nonSquareRangesForRows;
+        /** Array of ranges of non-square stones in the columns on the map (length is 2 * count of ranges). Speeds up round stones rolling. */
+        private final int[][] nonSquareRangesForCols;
 
         public StoneMap(List<String> lines) {
             this(
@@ -157,8 +167,8 @@ public class Day14 extends Day {
             int stepAfterCycles = cycleCountBeforeLoopStart + (int)((cycles - cycleCountBeforeLoopStart) % cycleCountOfLoop);
             return memoryStepToLoadNorth.get(stepAfterCycles);
         }
-        /** Returns this for chaining. */
 
+        /** Returns this for chaining. */
         public StoneMap rollFullCycle() {
             rollNorth();
             // System.out.printf("cycle N%n%s%n-%n", this);
@@ -405,31 +415,31 @@ public class Day14 extends Day {
 
     private StoneMap stoneMap;
 
-    @Override
-    protected void parsePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
         // read map
         var mapStrings = stream().collect(Collectors.toList());
         stoneMap = new StoneMap(mapStrings);
         // System.out.println(stoneMap);
     }
 
-    @Override
-    protected Object solvePart1() {
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         long result = stoneMap.rollNorth().calculateLoadNorth();
         // System.out.println(stoneMap);
         return result;
     }
 
-    @Override
-    protected void parsePart2() {
-        // read map (to reset part 1 changes)
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        // read map
         var mapStrings = stream().collect(Collectors.toList());
         stoneMap = new StoneMap(mapStrings);
         // System.out.println(stoneMap);
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         // if (true) return 0;
         long result = stoneMap.calculateLoadNorthAfter(1_000_000_000);
         return result;

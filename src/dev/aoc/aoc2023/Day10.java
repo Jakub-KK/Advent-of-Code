@@ -1,6 +1,8 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -12,7 +14,7 @@ import java.util.stream.IntStream;
 
 public class Day10 extends Day {
     public static void main(String[] args) {
-        new Day10("").run(); // _small1, _small2, _small3a, _small3b, _small4, _small5
+        Day.run(() -> new Day10("_sample1")); // _sample, _sample2, _sample3a, _sample3b, _sample4, _sample5
     }
 
     public Day10(String inputSuffix) {
@@ -27,8 +29,8 @@ public class Day10 extends Day {
         return map.get(y).charAt(x);
     }
 
-    @Override
-    protected void parsePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
         map = stream().collect(Collectors.toList());
         width = map.get(0).length();
         height = map.size();
@@ -114,8 +116,8 @@ public class Day10 extends Day {
 
     private final Map<PlaceIdx, Integer> distanceFromS = new HashMap<>(); // place idx -> distance from S
 
-    @Override
-    protected Object solvePart1() {
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         List<PipeHead> pipeHeads = new ArrayList<>(); // pipes most advanced place idx when searching
         PlaceIdx start = new PlaceIdx(startX, startY);
         pipeHeads.add(new PipeHead(start, PIDX_NULL));
@@ -146,8 +148,9 @@ public class Day10 extends Day {
 
     private final List<String> mapOnlyLoop = new ArrayList<>();
 
-    @Override
-    protected void parsePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        parsePart1();
         // create copy of map with only the loop visible
         IntStream.range(0, height).forEach(y -> {
             var sb = new StringBuilder(width);
@@ -163,20 +166,16 @@ public class Day10 extends Day {
     }
 
     private void saveMap(List<String> map, String outputSuffix) {
-        try {
-            try (BufferedWriter testWriter = Files.newBufferedWriter(Path.of("inputs/%s".formatted(getInputPath(getInputSuffix() + outputSuffix))))) {
-                map.forEach(line -> {
-                    try {
-                        testWriter.write(line);
-                        testWriter.write("\r\n");
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        createTestFile(getInputSuffix() + outputSuffix, writer -> {
+            map.forEach(line -> {
+                try {
+                    writer.write(line);
+                    writer.write("\r\n");
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        });
     }
 
     private Map<PlaceIdx, Boolean> placesInside = new HashMap<>();
@@ -199,8 +198,8 @@ public class Day10 extends Day {
         return (edges & 1) == 1; // place is inside if number of edge crossings is odd
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         IntStream.range(0, height).forEach(y -> {
             IntStream.range(0, width).forEach(x -> {
                 PlaceIdx pi = new PlaceIdx(x, y);

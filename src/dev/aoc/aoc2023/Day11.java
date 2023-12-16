@@ -1,6 +1,8 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -15,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class Day11 extends Day {
     public static void main(String[] args) {
-        new Day11("_small").run(); // _small, _large1, _large2, _large3
+        Day.run(() -> new Day11("")); //_sample, _large1, _large2, _large3
     }
 
     public Day11(String inputSuffix) {
@@ -33,8 +35,8 @@ public class Day11 extends Day {
 
     protected final SolverType solverType;
 
-    @Override
-    protected void parsePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
         // read map
         var mapStrings = stream().collect(Collectors.toList());
         int width = mapStrings.get(0).length();
@@ -42,20 +44,21 @@ public class Day11 extends Day {
         map = new Map(mapStrings, width, height);
     }
 
-    @Override
-    protected Object solvePart1() {
+        @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         final long expansionFactor = 2;
         ISolver solver = solverType.getSolver();
         long result = solver.solve(map, expansionFactor);
         return result;
     }
 
-    @Override
-    protected void parsePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        parsePart1();
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         final long expansionFactor = 1000000;
         ISolver solver = solverType.getSolver();
         long result = solver.solve(map, expansionFactor);

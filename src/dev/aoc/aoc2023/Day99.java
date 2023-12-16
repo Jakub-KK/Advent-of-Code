@@ -1,6 +1,8 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,26 +13,26 @@ public class Day99 extends Day {
     }
 
     public static void main(String[] args) {
-        new Day99("_small").run(); // _small
+        Day.run(() -> new Day99("_sample")); // _sample
     }
 
-    @Override
-    protected void parsePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
     }
 
-    @Override
-    protected Object solvePart1() {
-        int result = 0;
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
+        long result = 0;
         return result;
     }
 
-    @Override
-    protected void parsePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
     }
 
-    @Override
-    protected Object solvePart2() {
-        int result = 0;
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
+        long result = 0;
         return result;
     }
 
@@ -42,7 +44,7 @@ public class Day99 extends Day {
 
         @Test
         void solvePart1_small() {
-            var day = new Day99("_small");
+            var day = new Day99("_sample");
             day.parsePart1();
             assertEquals(0L, day.solvePart1());
         }
@@ -56,7 +58,7 @@ public class Day99 extends Day {
 
         @Test
         void solvePart2_small() {
-            var day = new Day99("_small");
+            var day = new Day99("_sample");
             day.parsePart1();
             day.parsePart2();
             assertEquals(0L, day.solvePart2());

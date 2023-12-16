@@ -1,6 +1,8 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
 import org.apache.commons.math3.analysis.polynomials.PolynomialFunctionLagrangeForm;
 
 import java.io.BufferedWriter;
@@ -15,8 +17,8 @@ import java.util.stream.*;
 
 public class Day09 extends Day {
     public static void main(String[] args) {
+        Day.run(() -> new Day09("")); // _sample, _large
         // new Day09("_large").createTest(200, 200, Integer.MAX_VALUE);
-        new Day09("").run(); // _small, _large
     }
 
     public Day09(String inputSuffix) {
@@ -25,13 +27,13 @@ public class Day09 extends Day {
 
     private List<List<Long>> inputs;
 
-    @Override
-    protected void parsePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
         inputs = stream().map(s -> Arrays.stream(s.split(" ")).map(Long::parseLong).toList()).toList();
     }
 
-    @Override
-    protected Object solvePart1() {
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         BigInteger result = inputs.stream()
                 .mapToLong(Day09::predictNext)
                 // .peek(v -> System.out.printf("%d%n", v))
@@ -44,12 +46,13 @@ public class Day09 extends Day {
         return result;
     }
 
-    @Override
-    protected void parsePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        parsePart1();
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         BigInteger result = inputs.stream()
                 .map(List::reversed)
                 .mapToLong(Day09::predictNext)
@@ -147,25 +150,20 @@ public class Day09 extends Day {
     }
 
     private void createTest(String testSuffix, int numOfSeqs, int length, int constRange) {
-        try {
-            try (BufferedWriter testWriter = Files.newBufferedWriter(Path.of("inputs/%s".formatted(getInputPath(testSuffix))))) {
-                List<String> seqs = IntStream.range(0, numOfSeqs)
-                        .mapToObj(i -> generateSequenceWithoutOverflow(length, constRange))
-                        .map(seq -> Arrays.stream(seq).boxed().map(Object::toString).collect(Collectors.joining(" ")))
-                        .peek(seqStr -> {
-                            try {
-                                testWriter.write(seqStr);
-                                testWriter.write("\r\n");
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }).toList();
-
-                // System.out.println(writeStatuses.allMatch(s -> s) ? "test created" : "test creation failed");
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        createTestFile(testSuffix, writer -> {
+            List<String> seqs = IntStream.range(0, numOfSeqs)
+                    .mapToObj(i -> generateSequenceWithoutOverflow(length, constRange))
+                    .map(seq -> Arrays.stream(seq).boxed().map(Object::toString).collect(Collectors.joining(" ")))
+                    .peek(seqStr -> {
+                        try {
+                            writer.write(seqStr);
+                            writer.write("\r\n");
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }).toList();
+            // System.out.println(writeStatuses.allMatch(s -> s) ? "test created" : "test creation failed");
+        });
     }
     private static long[] generateSequenceWithoutOverflow(int length, int constRange) {
         long[] sequence = null;

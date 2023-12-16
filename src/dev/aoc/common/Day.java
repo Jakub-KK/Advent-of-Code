@@ -1,16 +1,22 @@
 package dev.aoc.common;
 
+import org.javatuples.Pair;
+
 import java.io.*;
+import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.io.Files.asCharSource;
@@ -51,28 +57,126 @@ public abstract class Day {
 
     protected String getInputSuffix() { return inputSuffix != null ? inputSuffix : ""; }
 
-    public void run() {
-        String prefetchInput = inputString();
-
-        System.out.printf("Advent of Code %d day %02d, input size %d%n%n", aocYear, aocDay, prefetchInput.length());
-        runPart(this::parsePart1, this::solvePart1, 1);
-        runPart(this::parsePart2, this::solvePart2, 2);
+    public static void run(Supplier<Day> dayFactory) {
+        Day instance = dayFactory.get(); // we need instance to get class and methods, will be used later
+        var dayClass = instance.getClass();
+        var declaredMethods = dayClass.getDeclaredMethods();
+        var parsers = Arrays.stream(declaredMethods).filter(m -> m.isAnnotationPresent(SolutionParser.class)).toList();
+        var solvers = Arrays.stream(declaredMethods).filter(m -> m.isAnnotationPresent(SolutionSolver.class)).toList();
+        var parsersPerPart = parsers.stream().collect(Collectors.groupingBy(m -> m.getDeclaredAnnotation(SolutionParser.class).partNumber()));
+        var solversPerPart = solvers.stream().collect(Collectors.groupingBy(m -> m.getDeclaredAnnotation(SolutionSolver.class).partNumber()));
+        var parts = new TreeSet<Integer>();
+        parts.addAll(parsersPerPart.keySet());
+        parts.addAll(solversPerPart.keySet());
+        if (parts.isEmpty()) {
+            throw new IllegalArgumentException("no annotated methods found");
+        }
+        instance.showTitleAndPrefetchInput();
+        for (int partNumber : parts) {
+            var partElementsPerName = getPartElementsPerName(partNumber, parsersPerPart, solversPerPart);
+            for (var entry : partElementsPerName.entrySet()) {
+                if (instance == null) {
+                    instance = dayFactory.get();
+                }
+                final Day instance_ = instance; // make it final for lambda usage
+                runParserSolver(partNumber, entry.getValue().getValue0(), entry.getValue().getValue1(), instance_);
+                instance = null; // instance is spent
+            }
+        }
+    }
+    private static void runParserSolver(int partNumber, Method parser, Method solver, Day instance) {
+        instance.runPart(
+                () -> {
+                    try {
+                        parser.invoke(instance);
+                    } catch (ReflectiveOperationException e) {
+                        throw new RuntimeException(e);
+                    }
+                },
+                parser.getDeclaredAnnotation(SolutionParser.class).solutionName(),
+                () -> {
+                    try {
+                        return solver.invoke(instance);
+                    } catch (ReflectiveOperationException e) {
+                        throw new RuntimeException(e);
+                    }
+                },
+                solver.getDeclaredAnnotation(SolutionSolver.class).solutionName(),
+                partNumber
+        );
+    }
+    /**
+     * Create mapping "solution name" -> parser+solver
+     * There can be only one solver for a name. There must be one parser for a name that has solver or there is a default parser.
+     * @return mapping "solution name" -> parser+solver
+     */
+    private static HashMap<String, Pair<Method, Method>> getPartElementsPerName(int partNumber, Map<Integer, List<Method>> parsersPerPart, Map<Integer, List<Method>> solversPerPart) {
+        var partParsers = parsersPerPart.get(partNumber);
+        var partParsersPerName = partParsers.stream().collect(Collectors.groupingBy(m -> m.getDeclaredAnnotation(SolutionParser.class).solutionName()));
+        var partSolvers = solversPerPart.get(partNumber);
+        var partSolversPerName = partSolvers.stream().collect(Collectors.groupingBy(m -> m.getDeclaredAnnotation(SolutionSolver.class).solutionName()));
+        var partElementsPerName = new HashMap<String, Pair<Method, Method>>();
+        for (String solverName : partSolversPerName.keySet()) {
+            // get singular solver for current name
+            var solversOfName = partSolversPerName.get(solverName);
+            if (solversOfName.size() > 1) {
+                throw new IllegalArgumentException("part %d solvers name collision for name %s".formatted(partNumber, solverName));
+            }
+            Method solver = solversOfName.getFirst();
+            // get singular parser for current name, if not defined, get singular default parser
+            var parsersOfName = partParsersPerName.get(solverName);
+            Method parser;
+            if (parsersOfName.isEmpty()) {
+                var defaultParsers = partParsersPerName.get(DEFAULT_NAME);
+                if (defaultParsers.isEmpty()) {
+                    throw new IllegalArgumentException("part %d default parser missing for name %s".formatted(partNumber, solverName));
+                } else if (defaultParsers.size() > 1) {
+                    throw new IllegalArgumentException("part %d too many default parsers (%d) for name %s".formatted(partNumber, defaultParsers.size(), solverName));
+                } else {
+                    parser = defaultParsers.getFirst();
+                }
+            } else if (parsersOfName.size() > 1) {
+                throw new IllegalArgumentException("part %d parsers name collision for name %s".formatted(partNumber, solverName));
+            } else {
+                parser = parsersOfName.getFirst();
+                partParsersPerName.remove(solverName); // remove used parsers, to account for redundant ones
+            }
+            partElementsPerName.put(solverName, new Pair<>(parser, solver));
+        }
+        if (!partParsersPerName.isEmpty()) {
+            System.out.printf("*** part %d redundant parsers found: %s%n", partNumber, String.join(", ", partParsersPerName.keySet().stream().toList()));
+        }
+        return partElementsPerName;
     }
 
-    private void runPart(Runnable parser, Supplier<Object> solver, int partNumber) {
-        System.out.printf("PART %d PARSING%n", partNumber);
+    private void showTitleAndPrefetchInput() {
+        String prefetchInput = inputString();
+        System.out.printf("### Advent of Code %d day %02d, input size %d%n%n", aocYear, aocDay, prefetchInput.length());
+    }
+
+    public void run() {
+        runPart(this::parsePart1, "", this::solvePart1, "", 1);
+        runPart(this::parsePart2, "", this::solvePart2, "", 2);
+    }
+
+    private static final String DEFAULT_NAME = "default";
+
+    private void runPart(Runnable parser, String parserName, Supplier<Object> solver, String solverName, int partNumber) {
+        parserName = parserName.trim().isEmpty() ? DEFAULT_NAME : parserName;
+        System.out.printf("### Part %d, parser \"%s\": parsing...%n", partNumber, parserName);
         Instant parsingStart = Instant.now();
         parser.run();
         Instant parsingFinish = Instant.now();
-        System.out.printf("PART %d PARSER [elapsed: %s]%n", partNumber, Duration.between(parsingStart, parsingFinish).toString());
-        System.out.printf("PART %d SOLVING%n", partNumber);
+        System.out.printf("### Part %d, parser \"%s\": parsed [elapsed: %s]%n", partNumber, parserName, Duration.between(parsingStart, parsingFinish).toString());
+        solverName = solverName.trim().isEmpty() ? DEFAULT_NAME : solverName;
+        System.out.printf("### Part %d, solver \"%s\": solving...%n", partNumber, solverName);
         Instant solvingStart = Instant.now();
         Object partResult = solver.get();
         Instant solvingFinish = Instant.now();
         if (partResult != null) {
-            System.out.printf("PART %d SOLVER [elapsed: %s]: %n%s%n%n", partNumber, Duration.between(solvingStart, solvingFinish).toString(), partResult);
+            System.out.printf("### Part %d, solver \"%s\": solved [elapsed: %s]: %n%s%n%n", partNumber, solverName, Duration.between(solvingStart, solvingFinish).toString(), partResult);
         } else {
-            System.out.printf("PART %d SOLVER - UNCOMPLETED%n", partNumber);
+            System.out.printf("### Part %d, solver \"%s\": solver UNFINISHED%n", partNumber, solverName);
         }
     }
 
@@ -163,6 +267,16 @@ public abstract class Day {
             return asCharSource(file, defaultCharset()).read();
         } catch (IOException e) {
             throw new RuntimeException("Could not read file %s".formatted(file.getPath()));
+        }
+    }
+
+    protected void createTestFile(String testSuffix, Consumer<Writer> testGenerator) {
+        try {
+            try (BufferedWriter testWriter = Files.newBufferedWriter(Path.of("inputs/%s".formatted(getInputPath(testSuffix))))) {
+                testGenerator.accept(testWriter);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
