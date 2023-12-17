@@ -44,7 +44,7 @@ public class Day11 extends Day {
         map = new Map(mapStrings, width, height);
     }
 
-        @SolutionSolver(partNumber = 1)
+    @SolutionSolver(partNumber = 1)
     public Object solvePart1() {
         final long expansionFactor = 2;
         ISolver solver = solverType.getSolver();

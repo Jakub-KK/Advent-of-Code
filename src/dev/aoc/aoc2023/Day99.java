@@ -23,7 +23,7 @@ public class Day99 extends Day {
     @SolutionSolver(partNumber = 1)
     public Object solvePart1() {
         long result = 0;
-        return result;
+        return null;
     }
 
     @SolutionParser(partNumber = 2)
@@ -33,7 +33,7 @@ public class Day99 extends Day {
     @SolutionSolver(partNumber = 2)
     public Object solvePart2() {
         long result = 0;
-        return result;
+        return null;
     }
 
     public static class Day99Test {

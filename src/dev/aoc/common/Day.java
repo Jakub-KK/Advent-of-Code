@@ -155,6 +155,7 @@ public abstract class Day {
     }
 
     public void run() {
+        showTitleAndPrefetchInput();
         runPart(this::parsePart1, "", this::solvePart1, "", 1);
         runPart(this::parsePart2, "", this::solvePart2, "", 2);
     }
@@ -176,7 +177,7 @@ public abstract class Day {
         if (partResult != null) {
             System.out.printf("### Part %d, solver \"%s\": solved [elapsed: %s]: %n%s%n%n", partNumber, solverName, Duration.between(solvingStart, solvingFinish).toString(), partResult);
         } else {
-            System.out.printf("### Part %d, solver \"%s\": solver UNFINISHED%n", partNumber, solverName);
+            System.out.printf("### Part %d, solver \"%s\": solver UNFINISHED%n%n", partNumber, solverName);
         }
     }
 
@@ -272,7 +273,7 @@ public abstract class Day {
 
     protected void createTestFile(String testSuffix, Consumer<Writer> testGenerator) {
         try {
-            try (BufferedWriter testWriter = Files.newBufferedWriter(Path.of("inputs/%s".formatted(getInputPath(testSuffix))))) {
+            try (BufferedWriter testWriter = Files.newBufferedWriter(Path.of("inputs/%d/%s".formatted(aocYear, getInputPath(testSuffix))))) {
                 testGenerator.accept(testWriter);
             }
         } catch (IOException e) {
