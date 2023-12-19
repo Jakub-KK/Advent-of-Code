@@ -1,7 +1,7 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
-import dev.aoc.common.Grid;
+import dev.aoc.common.GridOfChars;
 import dev.aoc.common.SolutionParser;
 import dev.aoc.common.SolutionSolver;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,7 @@ public class Day16 extends Day {
         Day.run(() -> new Day16("")); // _sample, _simple1, _large1
     }
 
-    private Grid mirrorGrid; // '.' empty, '|' and '-' splitter, '/' and '\' mirrors
+    private GridOfChars mirrorGrid; // '.' empty, '|' and '-' splitter, '/' and '\' mirrors
 
     public enum Direction {
         UP(0, -1), NORTH(0, -1),
@@ -43,10 +43,10 @@ public class Day16 extends Day {
     public record BeamStart(int posX, int posY, Direction dir) {}
 
     /** Light beam path, '|' and '-' light direction, '+' light crossing, '*' mirrors */
-    private static class LightGrid extends Grid {
-        private final Grid mirrorGrid;
+    private static class LightGrid extends GridOfChars {
+        private final GridOfChars mirrorGrid;
 
-        public LightGrid(Grid mirrorGrid) {
+        public LightGrid(GridOfChars mirrorGrid) {
             super(mirrorGrid.getWidth(), mirrorGrid.getHeight(), '.');
             this.mirrorGrid = mirrorGrid;
         }
@@ -151,7 +151,7 @@ public class Day16 extends Day {
 
     private void parse() {
         var mapStrings = stream().collect(Collectors.toList());
-        mirrorGrid = new Grid(mapStrings);
+        mirrorGrid = new GridOfChars(mapStrings);
         int countEmpty = mirrorGrid.count(c -> c == '.');
         int countSplitterVertical = mirrorGrid.count(c -> c == '|');
         int countSplitterHorizontal = mirrorGrid.count(c -> c == '-');
@@ -165,7 +165,7 @@ public class Day16 extends Day {
     private void createTest(String testSuffix, int side, double probObject) {
         createTestFile(testSuffix, writer -> {
             var rng = new Random();
-            Grid test = new Grid(side, side, '.');
+            GridOfChars test = new GridOfChars(side, side, '.');
             String objects = "/\\|-";
             test.map((row, col) -> {
                 if (rng.nextDouble() < probObject) {

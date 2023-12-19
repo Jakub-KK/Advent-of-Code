@@ -30,7 +30,7 @@ public class Day17 extends Day {
 
     private final int MAX_STEPS = 3;
 
-    private static class CityGrid extends Grid2<Integer> {
+    private static class CityGrid extends Grid<Integer> {
         public CityGrid(List<String> lines, String elementDelimiter, Function<String, Integer> parser, Supplier<Class<?>> classSupplier) {
             super(lines, elementDelimiter, parser, classSupplier);
         }
@@ -198,7 +198,7 @@ public class Day17 extends Day {
                     } while (routeNode != null);
                     return route;
                 }
-                Grid2<Character> routeMap = new Grid2<>(cityGrid.getWidth(), cityGrid.getHeight(), '.', "");
+                Grid<Character> routeMap = new Grid<>(cityGrid.getWidth(), cityGrid.getHeight(), '.', "");
                 allNodes.values().forEach(n -> routeMap.set(((GridGraphNode)n.current).col, ((GridGraphNode)n.current).row, n.routeScore < scoreDebug.length ? scoreDebug[n.routeScore] : '?'));
                 openSet.forEach(n -> routeMap.set(((GridGraphNode)n.current).col, ((GridGraphNode)n.current).row, '*'));
                 System.out.println(routeMap);
@@ -667,7 +667,7 @@ public class Day17 extends Day {
         pathfinder.memoStatsReport();
     }
     private void memoDebug() {
-        Grid2<List<Triplet<Direction, Integer, GridGraphNode>>> memoCheck = new Grid2<>(cityGrid.getWidth(), cityGrid.getHeight(), null, ArrayList.class, " ||| ");
+        Grid<List<Triplet<Direction, Integer, GridGraphNode>>> memoCheck = new Grid<>(cityGrid.getWidth(), cityGrid.getHeight(), null, ArrayList.class, " ||| ");
         for (Map.Entry<Integer, Pair<Integer, GridGraphNode>> entry : bestPathsForConstraintAndNode.entrySet()) {
             int key = entry.getKey();
             // memoKey = lastDir + 4 * (lastStepsInTheSameDir - 1 + 3 * current.getId());
@@ -714,12 +714,12 @@ public class Day17 extends Day {
             });
             path = new ArrayList<>();
             path.add(source);
-            pathMarkers = new Grid2<>(cityGrid.getWidth(), cityGrid.getHeight(), false, "");
+            pathMarkers = new Grid<>(cityGrid.getWidth(), cityGrid.getHeight(), false, "");
             pathMarkers.set(source.col, source.row, true);
         }
 
         private final List<GridGraphNode> path;
-        private final Grid2<Boolean> pathMarkers;
+        private final Grid<Boolean> pathMarkers;
 
         public int getBestScore() {
             return bestScore;
@@ -852,7 +852,7 @@ public class Day17 extends Day {
     }
 
     private void debugShowPath(String title, List<GridGraphNode> path) {
-        Grid2<Character> pathMap = new Grid2<>(cityGrid.getWidth(), cityGrid.getHeight(), '.', "");
+        Grid<Character> pathMap = new Grid<>(cityGrid.getWidth(), cityGrid.getHeight(), '.', "");
         pathMap.set(path.getFirst().col, path.getFirst().row, '*');
         char[] routeSymbols = "<>^v".toCharArray();
         for (int ri = 1; ri < path.size(); ri++) {

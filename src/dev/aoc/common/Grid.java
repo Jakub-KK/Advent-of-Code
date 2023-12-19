@@ -1,22 +1,32 @@
 package dev.aoc.common;
 
-import java.nio.CharBuffer;
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
-public class Grid {
-    private final char[][] symbols;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class Grid<T> {
+    private final T[][] elements;
     private final int width;
     private final int height;
+    /** Element delimiter in string representation */
+    private final String elementDelimiter;
 
-    public Grid(List<String> lines) {
+    public Grid(List<String> lines, String elementDelimiter, Function<String, T> parser, Supplier<Class<?>> classSupplier) {
         this(
-                toArray(verifyEqualLengths(lines)),
+                verifyEqualLengths(toArray(lines, parser, elementDelimiter, classSupplier)),
                 lines.getFirst().length(),
-                lines.size()
+                lines.size(),
+                elementDelimiter
         );
     }
     private static List<String> verifyEqualLengths(List<String> lines) {
@@ -29,38 +39,59 @@ public class Grid {
         });
         return lines;
     }
-    public Grid(int width, int height, char fillSymbol) {
-        this(emptyGrid(width, height, fillSymbol), width, height);
+    private static <T> T[][] verifyEqualLengths(T[][] elements) {
+        int height = elements.length;
+        if (height > 0) {
+            int width = elements[0].length;
+            IntStream.range(1, height).forEach(row -> {
+                if (elements[row].length != width) {
+                    throw new IllegalArgumentException("line length mismatch at row %d".formatted(row));
+                }
+            });
+        }
+        return elements;
     }
-    private static char[][] emptyGrid(int width, int height, char fillSymbol) {
-        char[][] result = new char[height][];
-        IntStream.range(0, height).forEach(row -> {
-            result[row] = new char[width];
-            Arrays.fill(result[row], fillSymbol);
-        });
+    public Grid(int width, int height, T fillElement, String elementDelimiter) {
+        this(emptyGrid(width, height, fillElement), width, height, elementDelimiter);
+    }
+    public Grid(int width, int height, T fillElement, Class<?> anElementClass, String elementDelimiter) {
+        this(emptyGrid(width, height, anElementClass, fillElement), width, height, elementDelimiter);
+    }
+    private static <T> T[][] emptyGrid(int width, int height, T fillSymbol) {
+        Class<?> aClass = fillSymbol.getClass();
+        return emptyGrid(width, height, aClass, fillSymbol);
+    }
+    private static <T> T[][] emptyGrid(int width, int height, Class<?> anElementClass, T fillSymbol) {
+        @SuppressWarnings("unchecked")
+        T[][] result = (T[][])Array.newInstance(anElementClass, height, width);
+        IntStream.range(0, height).forEach(row -> Arrays.fill(result[row], fillSymbol));
         return result;
     }
-    private Grid(char[][] symbols, int width, int height) {
-        this.symbols = symbols;
+    private Grid(T[][] elements, int width, int height, String elementDelimiter) {
+        this.elements = elements;
         this.width = width;
         this.height = height;
+        this.elementDelimiter = elementDelimiter;
     }
 
-    public char get(int col, int row) {
-        return symbols[row][col];
+    public T get(int col, int row) {
+        return elements[row][col];
     }
-    public void set(int col, int row, char s) {
-        symbols[row][col] = s;
+    public void set(int col, int row, T s) {
+        elements[row][col] = s;
     }
 
-    public boolean is(int col, int row, char s) {
-        return symbols[row][col] == s;
+    public boolean has(int col, int row) {
+        return elements[row][col] != null;
     }
-    public boolean isNot(int col, int row, char s) {
-        return symbols[row][col] != s;
+    public boolean is(int col, int row, T s) {
+        return elements[row][col] == s;
     }
-    public boolean isInSet(int col, int row, String set) {
-        return set.indexOf(symbols[row][col]) >= 0;
+    public boolean isNot(int col, int row, T s) {
+        return elements[row][col] != s;
+    }
+    public boolean isInSet(int col, int row, Set<T> set) {
+        return set.contains(elements[row][col]);
     }
 
     public int getWidth() {
@@ -71,6 +102,14 @@ public class Grid {
         return height;
     }
 
+    public int getUniqueId(int col, int row) {
+        return row * width + col;
+    }
+
+    public int getUniqueIdMax() {
+        return width * height;
+    }
+
     public boolean hasColumn(int col) {
         return col >= 0 && col < width;
     }
@@ -79,11 +118,11 @@ public class Grid {
         return row >= 0 && row < height;
     }
 
-    public int count(Predicate<Character> predicate) {
+    public int count(Predicate<T> predicate) {
         int count = 0;
         for (int row = 0; row < height; row++) {
             for (int col = 0; col < width; col++) {
-                if (predicate.test(symbols[row][col])) {
+                if (predicate.test(elements[row][col])) {
                     count++;
                 }
             }
@@ -91,59 +130,69 @@ public class Grid {
         return count;
     }
 
-    public void map(BiFunction<Integer, Integer, Character> mapper) {
+    public void map(BiFunction<Integer, Integer, T> mapper) {
         for (int row = 0; row < height; row++) {
             for (int col = 0; col < width; col++) {
-                symbols[row][col] = mapper.apply(col, row);
+                elements[row][col] = mapper.apply(col, row);
             }
         }
     }
 
-    public void fill(char fillSymbol) {
-        IntStream.range(0, height).forEach(row -> {
-            Arrays.fill(symbols[row], fillSymbol);
-        });
+    public void fill(char fillElement) {
+        IntStream.range(0, height).forEach(row -> Arrays.fill(elements[row], fillElement));
     }
 
-    private List<String> toLines(char[][] mapArray) {
-        return Arrays.stream(mapArray).map(chs -> CharBuffer.wrap(chs).toString()).toList();
+    protected String toStringCell(T cell) {
+        return cell == null ? "<null>" : cell.toString();
     }
 
-    private static char[][] toArray(List<String> lines) {
-        char[][] result = new char[lines.size()][];
+    private List<String> toLines(T[][] mapArray) {
+        return Arrays.stream(mapArray).map(ts -> String.join(elementDelimiter, Arrays.stream(ts).map(this::toStringCell).toList())).toList();
+    }
+
+    private static <T> T[][] toArray(List<String> lines, Function<String, T> parser, String elementDelimiter, Supplier<Class<?>> classSupplier) {
+        Class<?> elementClass = classSupplier.get();
+        Class<?> arrayClass = Array.newInstance(elementClass, 0).getClass();
+        @SuppressWarnings("unchecked")
+        T[][] result = (T[][])Array.newInstance(arrayClass, lines.size());
         IntStream.range(0, result.length).forEach(row -> {
-            result[row] = new char[lines.getFirst().length()];
-            String rowLine = lines.get(row);
-            IntStream.range(0, result[row].length).forEach(col -> {
-                result[row][col] = rowLine.charAt(col);
-            });
+            String line = lines.get(row);
+            String[] lineElements = line.split(elementDelimiter);
+            result[row] = (T[])Array.newInstance(elementClass, lineElements.length);
+            IntStream.range(0, result[row].length).forEach(col -> result[row][col] = parser.apply(lineElements[col]));
         });
         return result;
     }
 
     private static char[][] clone(char[][] arr) {
         char[][] result = new char[arr.length][];
-        IntStream.range(0, arr.length).forEach(row -> {
-            result[row] = Arrays.copyOf(arr[row], arr[row].length);
-        });
+        IntStream.range(0, arr.length).forEach(row -> result[row] = Arrays.copyOf(arr[row], arr[row].length));
         return result;
     }
 
     @Override
     public String toString() {
-        return String.join("%n".formatted(), toLines(symbols));
+        return String.join("%n".formatted(), toLines(elements));
     }
 
     @Override
     public int hashCode() {
-        return Arrays.hashCode(Arrays.stream(symbols).mapToInt(Arrays::hashCode).toArray());
+        return Arrays.hashCode(Arrays.stream(elements).mapToInt(Arrays::hashCode).toArray());
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Grid grid = (Grid)o;
-        return Arrays.deepEquals(symbols, grid.symbols);
+        Grid<T> that = (Grid<T>)o;
+        return Arrays.deepEquals(elements, that.elements) && elementDelimiter.equals(that.elementDelimiter);
+    }
+
+    public static class GridOfCharsTest {
+        @Test
+        void test() {
+            Grid<Integer> intGrid = new Grid<>(2, 2, -1, ", ");
+            assertEquals(true, intGrid.is(0, 0, -1));
+        }
     }
 }
