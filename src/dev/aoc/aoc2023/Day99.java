@@ -59,7 +59,6 @@ public class Day99 extends Day {
         @Test
         void solvePart2_small() {
             var day = new Day99("_sample");
-            day.parsePart1();
             day.parsePart2();
             assertEquals(0L, day.solvePart2());
         }

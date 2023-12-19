@@ -70,10 +70,10 @@ public class Day16 extends Day {
                 // propagate: find a position where the light beam hits a symbol or exits grid
                 int posX = head.posX, posY = head.posY;
                 int dX = head.dir.dX, dY = head.dir.dY;
-                while (mirrorGrid.isColumnInGrid(posX) && mirrorGrid.isRowInGrid(posY) && (
-                        (mirrorGrid.isSymbol(posX, posY,'.') ||
-                                (dX == 0 && mirrorGrid.isSymbol(posX, posY,'|')) || // pass through splitter parallel to light beam
-                                (dY == 0 && mirrorGrid.isSymbol(posX, posY,'-'))
+                while (mirrorGrid.hasColumn(posX) && mirrorGrid.hasRow(posY) && (
+                        (mirrorGrid.is(posX, posY,'.') ||
+                                (dX == 0 && mirrorGrid.is(posX, posY,'|')) || // pass through splitter parallel to light beam
+                                (dY == 0 && mirrorGrid.is(posX, posY,'-'))
                         )
                 )) {
                     // use light grid to remember beam positions and direction
@@ -82,7 +82,7 @@ public class Day16 extends Day {
                     posY += dY;
                 }
                 // if beam ended outside of grid, forget about it
-                if (!mirrorGrid.isColumnInGrid(posX) || !mirrorGrid.isRowInGrid(posY)) {
+                if (!mirrorGrid.hasColumn(posX) || !mirrorGrid.hasRow(posY)) {
                     continue;
                 }
                 // remember...
@@ -90,29 +90,29 @@ public class Day16 extends Day {
                 // beam hit an object which splits or mirrors, spawn new beams depending on object and beam direction
                 // do not reenter positions that were visited before if the same beam direction (taking crossing into account)
                 // always reenter mirrors (entering from the other side special case)
-                char objectSymbol = mirrorGrid.getSymbol(posX, posY);
-                if ((objectSymbol == '|' || (objectSymbol == '/' && dX > 0) || (objectSymbol == '\\' && dX < 0)) && posY > 0 && this.isSymbolInSet(posX, posY - 1, ".*-")) {
+                char objectSymbol = mirrorGrid.get(posX, posY);
+                if ((objectSymbol == '|' || (objectSymbol == '/' && dX > 0) || (objectSymbol == '\\' && dX < 0)) && posY > 0 && this.isInSet(posX, posY - 1, ".*-")) {
                     lightHeads.add(new BeamStart(posX, posY - 1, Direction.UP)); // add light beam traveling up
                 }
-                if ((objectSymbol == '|' || (objectSymbol == '/' && dX < 0) || (objectSymbol == '\\' && dX > 0)) && posY < mirrorGrid.getHeight() - 1 && this.isSymbolInSet(posX, posY + 1, ".*-")) {
+                if ((objectSymbol == '|' || (objectSymbol == '/' && dX < 0) || (objectSymbol == '\\' && dX > 0)) && posY < mirrorGrid.getHeight() - 1 && this.isInSet(posX, posY + 1, ".*-")) {
                     lightHeads.add(new BeamStart(posX, posY + 1, Direction.DOWN)); // add light beam traveling down
                 }
-                if ((objectSymbol == '-' || (objectSymbol == '/' && dY > 0) || (objectSymbol == '\\' && dY < 0)) && posX > 0 && this.isSymbolInSet(posX - 1, posY, ".*|")) {
+                if ((objectSymbol == '-' || (objectSymbol == '/' && dY > 0) || (objectSymbol == '\\' && dY < 0)) && posX > 0 && this.isInSet(posX - 1, posY, ".*|")) {
                     lightHeads.add(new BeamStart(posX - 1, posY, Direction.LEFT)); // add light beam traveling left
                 }
-                if ((objectSymbol == '-' || (objectSymbol == '/' && dY < 0) || (objectSymbol == '\\' && dY > 0)) && posX < mirrorGrid.getWidth() - 1 && this.isSymbolInSet(posX + 1, posY, ".*|")) {
+                if ((objectSymbol == '-' || (objectSymbol == '/' && dY < 0) || (objectSymbol == '\\' && dY > 0)) && posX < mirrorGrid.getWidth() - 1 && this.isInSet(posX + 1, posY, ".*|")) {
                     lightHeads.add(new BeamStart(posX + 1, posY, Direction.RIGHT)); // add light beam traveling right
                 }
             }
             return this.count(c -> c != '.');
         }
         private void markBeamPath(int posX, int posY, boolean isBeamHorizontal) {
-            if (mirrorGrid.isSymbolInSet(posX, posY, "/\\")) {
-                this.setSymbol(posX, posY, '*'); // special mark for mirrors to allow reentry (from the other side)
-            } else if (this.isSymbolInSet(posX, posY, "|-") && this.isSymbolNot(posX, posY, isBeamHorizontal ? '-' : '|')) {
-                this.setSymbol(posX, posY, '+'); // mark light crossings
+            if (mirrorGrid.isInSet(posX, posY, "/\\")) {
+                this.set(posX, posY, '*'); // special mark for mirrors to allow reentry (from the other side)
+            } else if (this.isInSet(posX, posY, "|-") && this.isNot(posX, posY, isBeamHorizontal ? '-' : '|')) {
+                this.set(posX, posY, '+'); // mark light crossings
             } else {
-                this.setSymbol(posX, posY, isBeamHorizontal ? '-' : '|');
+                this.set(posX, posY, isBeamHorizontal ? '-' : '|');
             }
         }
 

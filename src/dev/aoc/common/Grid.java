@@ -4,7 +4,6 @@ import java.nio.CharBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
@@ -47,20 +46,20 @@ public class Grid {
         this.height = height;
     }
 
-    public char getSymbol(int col, int row) {
+    public char get(int col, int row) {
         return symbols[row][col];
     }
-    public void setSymbol(int col, int row, char s) {
+    public void set(int col, int row, char s) {
         symbols[row][col] = s;
     }
 
-    public boolean isSymbol(int col, int row, char s) {
+    public boolean is(int col, int row, char s) {
         return symbols[row][col] == s;
     }
-    public boolean isSymbolNot(int col, int row, char s) {
+    public boolean isNot(int col, int row, char s) {
         return symbols[row][col] != s;
     }
-    public boolean isSymbolInSet(int col, int row, String set) {
+    public boolean isInSet(int col, int row, String set) {
         return set.indexOf(symbols[row][col]) >= 0;
     }
 
@@ -72,11 +71,11 @@ public class Grid {
         return height;
     }
 
-    public boolean isColumnInGrid(int col) {
+    public boolean hasColumn(int col) {
         return col >= 0 && col < width;
     }
 
-    public boolean isRowInGrid(int row) {
+    public boolean hasRow(int row) {
         return row >= 0 && row < height;
     }
 
@@ -101,8 +100,8 @@ public class Grid {
     }
 
     public void fill(char fillSymbol) {
-        IntStream.range(0, height).forEach(i -> {
-            Arrays.fill(symbols[i], fillSymbol);
+        IntStream.range(0, height).forEach(row -> {
+            Arrays.fill(symbols[row], fillSymbol);
         });
     }
 
