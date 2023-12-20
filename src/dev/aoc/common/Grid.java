@@ -11,6 +11,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -136,6 +137,10 @@ public class Grid<T> {
                 elements[row][col] = mapper.apply(col, row);
             }
         }
+    }
+
+    public <R> Stream<R> mapLine(Function<T[], R> mapper) {
+        return Arrays.stream(elements).map(mapper);
     }
 
     public void fill(char fillElement) {
