@@ -1,0 +1,7 @@
+broadcaster -> nt
+dummy -> rx
+%nt -> xq, cx
+&xq -> cx, qh, nt
+%cx -> qh
+%qh -> ln
+%ln -> xq
