@@ -51,6 +51,8 @@ public class Day18 extends Day {
 
     private record DigPlanItem(Direction dir, int length, String rgbStr) {}
 
+    private List<DigPlanItem> digPlanList;
+
     private final List<Pair<Long, Long>> points = new ArrayList<>();
 
     private long sumEdgeLength = 0;
@@ -67,6 +69,8 @@ public class Day18 extends Day {
     public Object solvePart1() {
         convertDigPlanToPoints();
         long area = getAreaFromPointsOfSimplePolygon();
+        // formula discovery: https://old.reddit.com/r/adventofcode/comments/18l8mao/2023_day_18_intuition_for_why_spoiler_alone/kdwsdmp/
+        // actual formula source: Pick's Theorem, explanation https://old.reddit.com/r/adventofcode/comments/18l8mao/2023_day_18_intuition_for_why_spoiler_alone/
         long result = sumEdgeLength + area - (sumEdgeLength / 2 - 1);
         return result;
     }
@@ -288,8 +292,6 @@ public class Day18 extends Day {
         System.out.println(lavaLagoon);
         return sumWalls + sumInterior;
     }
-
-    private List<DigPlanItem> digPlanList;
 
     public static class Day18Test {
         @Test

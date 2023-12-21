@@ -128,7 +128,7 @@ public class Day17 extends Day {
         if (this.getInputSuffix().contains("_blackhole_")) parser = CityGrid::parserBlackhole;
         cityGrid = new CityGrid(mapStrings, "", parser, Integer.valueOf(0)::getClass);
         System.out.printf("city grid %d x %d%n", cityGrid.getWidth(), cityGrid.getHeight());
-        System.out.println(cityGrid);
+        // System.out.println(cityGrid);
         System.out.printf("grid hash %d%n", cityGrid.hashCode());
     }
 
