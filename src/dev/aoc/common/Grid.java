@@ -1,15 +1,13 @@
 package dev.aoc.common;
 
+import org.javatuples.Pair;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -21,13 +19,15 @@ public class Grid<T> {
     private final int height;
     /** Element delimiter in string representation */
     private final String elementDelimiter;
+    protected final Class<?> elementClass;
 
-    public Grid(List<String> lines, String elementDelimiter, Function<String, T> parser, Supplier<Class<?>> classSupplier) {
+    public Grid(List<String> lines, String elementDelimiter, Function<String, T> parser, Class<?> elementClass) {
         this(
-                verifyEqualLengths(toArray(lines, parser, elementDelimiter, classSupplier)),
+                verifyEqualLengths(toArray(lines, parser, elementDelimiter, elementClass)),
                 lines.getFirst().length(),
                 lines.size(),
-                elementDelimiter
+                elementDelimiter,
+                elementClass
         );
     }
     private static List<String> verifyEqualLengths(List<String> lines) {
@@ -53,10 +53,10 @@ public class Grid<T> {
         return elements;
     }
     public Grid(int width, int height, T fillElement, String elementDelimiter) {
-        this(emptyGrid(width, height, fillElement), width, height, elementDelimiter);
+        this(emptyGrid(width, height, fillElement), width, height, elementDelimiter, fillElement.getClass());
     }
     public Grid(int width, int height, T fillElement, Class<?> anElementClass, String elementDelimiter) {
-        this(emptyGrid(width, height, anElementClass, fillElement), width, height, elementDelimiter);
+        this(emptyGrid(width, height, anElementClass, fillElement), width, height, elementDelimiter, anElementClass);
     }
     private static <T> T[][] emptyGrid(int width, int height, T fillSymbol) {
         Class<?> aClass = fillSymbol.getClass();
@@ -68,11 +68,20 @@ public class Grid<T> {
         IntStream.range(0, height).forEach(row -> Arrays.fill(result[row], fillSymbol));
         return result;
     }
-    private Grid(T[][] elements, int width, int height, String elementDelimiter) {
+    private Grid(T[][] elements, int width, int height, String elementDelimiter, Class<?> elementClass) {
         this.elements = elements;
         this.width = width;
         this.height = height;
         this.elementDelimiter = elementDelimiter;
+        this.elementClass = elementClass;
+    }
+    /** Get Grid with the same dimensions (and element delimiter) as this one */
+    public Grid<T> getTemplate(T fillElement) {
+        return new Grid<>(width, height, fillElement, elementClass, elementDelimiter);
+    }
+    /** Get Grid with the same dimensions and contentst (and element delimiter) as this one */
+    public Grid<T> getClone() {
+        return new Grid<T>(cloneArray(elements, elementClass), width, height, elementDelimiter, elementClass);
     }
 
     public T get(int col, int row) {
@@ -103,6 +112,10 @@ public class Grid<T> {
         return height;
     }
 
+    public String getElementDelimiter() {
+        return elementDelimiter;
+    }
+
     public int getUniqueId(int col, int row) {
         return row * width + col;
     }
@@ -119,11 +132,27 @@ public class Grid<T> {
         return row >= 0 && row < height;
     }
 
+    public boolean hasPos(int col, int row) {
+        return hasColumn(col) && hasRow(row);
+    }
+
     public int count(Predicate<T> predicate) {
         int count = 0;
         for (int row = 0; row < height; row++) {
             for (int col = 0; col < width; col++) {
                 if (predicate.test(elements[row][col])) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    public int count(BiPredicate<Integer, Integer> predicate) {
+        int count = 0;
+        for (int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
+                if (predicate.test(col, row)) {
                     count++;
                 }
             }
@@ -137,6 +166,26 @@ public class Grid<T> {
                 elements[row][col] = mapper.apply(col, row);
             }
         }
+    }
+
+    public <R> Grid<R> map(Function<T, R> mapper, Class<?> elementUClass) {
+        Grid<R> result = new Grid<>(getWidth(), getHeight(), null, elementUClass, elementDelimiter);
+        for (int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
+                result.elements[row][col] = mapper.apply(elements[row][col]);
+            }
+        }
+        return result;
+    }
+
+    public <R> Grid<R> map(BiFunction<Pair<Integer, Integer>, T, R> mapper, Class<?> elementUClass) {
+        Grid<R> result = new Grid<>(getWidth(), getHeight(), null, elementUClass, elementDelimiter);
+        for (int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
+                result.elements[row][col] = mapper.apply(new Pair<>(col, row), elements[row][col]);
+            }
+        }
+        return result;
     }
 
     public <R> Stream<R> mapLine(Function<T[], R> mapper) {
@@ -155,8 +204,11 @@ public class Grid<T> {
         return Arrays.stream(mapArray).map(ts -> String.join(elementDelimiter, Arrays.stream(ts).map(this::toStringCell).toList())).toList();
     }
 
-    private static <T> T[][] toArray(List<String> lines, Function<String, T> parser, String elementDelimiter, Supplier<Class<?>> classSupplier) {
-        Class<?> elementClass = classSupplier.get();
+    public List<String> toLines() {
+        return toLines(elements);
+    }
+
+    private static <T> T[][] toArray(List<String> lines, Function<String, T> parser, String elementDelimiter, Class<?> elementClass) {
         Class<?> arrayClass = Array.newInstance(elementClass, 0).getClass();
         @SuppressWarnings("unchecked")
         T[][] result = (T[][])Array.newInstance(arrayClass, lines.size());
@@ -165,6 +217,16 @@ public class Grid<T> {
             String[] lineElements = line.split(elementDelimiter);
             result[row] = (T[])Array.newInstance(elementClass, lineElements.length);
             IntStream.range(0, result[row].length).forEach(col -> result[row][col] = parser.apply(lineElements[col]));
+        });
+        return result;
+    }
+
+    private static <T> T[][] cloneArray(T[][] elements, Class<?> elementClass) {
+        Class<?> arrayClass = Array.newInstance(elementClass, 0).getClass();
+        @SuppressWarnings("unchecked")
+        T[][] result = (T[][])Array.newInstance(arrayClass, elements.length);
+        IntStream.range(0, result.length).forEach(row -> {
+            result[row] = Arrays.copyOf(elements[row], elements[row].length);
         });
         return result;
     }
@@ -193,7 +255,23 @@ public class Grid<T> {
         return Arrays.deepEquals(elements, that.elements) && elementDelimiter.equals(that.elementDelimiter);
     }
 
-    public static class GridOfCharsTest {
+    public enum Direction {
+        UP(0, -1), NORTH(0, -1),
+        DOWN(0, 1), SOUTH(0, 1),
+        LEFT(-1, 0), WEST(-1, 0),
+        RIGHT(1, 0), EAST(1, 0);
+        public final int dCol;
+        public final int dRow;
+        Direction(int dCol, int dRow) {
+            this.dCol = dCol;
+            this.dRow = dRow;
+        }
+        public static Direction[] getAll() {
+            return new Direction[] { Direction.UP, Direction.RIGHT, Direction.DOWN, Direction.LEFT };
+        }
+    }
+
+    public static class GridTest {
         @Test
         void test() {
             Grid<Integer> intGrid = new Grid<>(2, 2, -1, ", ");

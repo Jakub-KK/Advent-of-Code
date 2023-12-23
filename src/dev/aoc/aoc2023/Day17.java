@@ -29,8 +29,8 @@ public class Day17 extends Day {
     }
 
     private static class CityGrid extends Grid<Integer> {
-        public CityGrid(List<String> lines, String elementDelimiter, Function<String, Integer> parser, Supplier<Class<?>> classSupplier) {
-            super(lines, elementDelimiter, parser, classSupplier);
+        public CityGrid(List<String> lines, String elementDelimiter, Function<String, Integer> parser, Class<?> elementClass) {
+            super(lines, elementDelimiter, parser, elementClass);
         }
 
         public CityGrid(int width, int height, Integer fillElement, String elementDelimiter) {
@@ -126,10 +126,9 @@ public class Day17 extends Day {
         var mapStrings = stream().collect(Collectors.toList());
         Function<String, Integer> parser = Integer::parseInt;
         if (this.getInputSuffix().contains("_blackhole_")) parser = CityGrid::parserBlackhole;
-        cityGrid = new CityGrid(mapStrings, "", parser, Integer.valueOf(0)::getClass);
-        System.out.printf("city grid %d x %d%n", cityGrid.getWidth(), cityGrid.getHeight());
+        cityGrid = new CityGrid(mapStrings, "", parser, Integer.valueOf(0).getClass());
+        System.out.printf("city grid %d x %d, hash %d%n", cityGrid.getWidth(), cityGrid.getHeight(), cityGrid.hashCode());
         // System.out.println(cityGrid);
-        System.out.printf("grid hash %d%n", cityGrid.hashCode());
     }
 
     private class Solver {
