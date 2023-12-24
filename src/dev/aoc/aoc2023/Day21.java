@@ -22,7 +22,7 @@ public class Day21 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day21("_sample_1x1maps"));
+        Day.run(() -> new Day21(""));
         // _sample_1x1maps, _sample_3x3maps
         // _sample_empty_1x1maps - fully symmetric
         // _sample_twohead_1x1maps - maximally asymmetric
@@ -522,11 +522,14 @@ public class Day21 extends Day {
         5. thus, each flood grid can be easily obtained by adding a constant multiplied by distance from "stable" flood grid from axis or diagonal
          */
         long plotCountReachableInSteps = 0;
-        // IntStream.range(1, 101).forEach(maxSteps -> {
-        //     System.out.printf("max steps %d: plot count %d%n", maxSteps, getPlotCountReachableInSteps(maxSteps));
+        // IntStream.range(1, 501).forEach(maxSteps -> {
+        //     System.out.printf("max steps %d%n", maxSteps);
+        //     ReturnData result = getPlotCountReachableInSteps(maxSteps, false, false);
+        //     analysis(result);
+        //     System.out.printf("max steps %d: plot count %d%n", maxSteps, result.plotCountReachableInSteps);
         // });
-        int maxSteps = 100;//26501365
-        ReturnData result = getPlotCountReachableInSteps(maxSteps);
+        int maxSteps = 26501365;//26501365
+        ReturnData result = getPlotCountReachableInSteps(maxSteps, true, false, false);
         analysis(result);
         plotCountReachableInSteps = result.plotCountReachableInSteps;
         return plotCountReachableInSteps;
@@ -537,16 +540,19 @@ public class Day21 extends Day {
             long plotCountReachableInSteps,
             Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitMap,
             Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitParents,
-            long cycles
+            long cycles,
+            boolean optimized
     ) {}
 
     private enum WorkPhase { Intro, Intro2ndCircle, FindCycle, Skip, Finish }
     private ReturnData getPlotCountReachableInSteps(int maxSteps) {
+        return getPlotCountReachableInSteps(maxSteps, false, false, false);
+    }
+    private ReturnData getPlotCountReachableInSteps(int maxSteps, boolean logging, boolean doNotOptimize, boolean storeParentFloods) {
         long plotCountReachableInSteps = 0;
         // create grid of floods going CW from pos (1,0) making ever bigger circles around origin
         Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitMap = new HashMap<>();
         Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitParents = new HashMap<>();
-        final boolean storeParents = true;
         GardenGrid.FloodUnit floodUnit = gardenGrid.flood();
         boolean mapReadyForMaxSteps = !floodUnit.isAchievableIn(maxSteps);
         plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
@@ -560,7 +566,7 @@ public class Day21 extends Day {
         WorkPhase workPhase = WorkPhase.Intro;
         int simulationPhase1_MinCycles = Integer.MAX_VALUE;
         int minCycleStart = 0;
-        boolean continueWork = true;
+        boolean continueWork = doNotOptimize;
         while (!mapReadyForMaxSteps) {
             boolean canSkip = cycleStable;// && (cycles & 1) == 0; // all floods stable (constant difference with respect to parent) and stable diagonal is in circle
             boolean earlyExit = false;
@@ -573,13 +579,13 @@ public class Day21 extends Day {
                             cycles++;
                             mapReadyForMaxSteps = true;
                             cycleStable = false;
-                            System.out.printf("simulation phase %d: after first stable cycle create the next one%n", workPhase.ordinal());
+                            if (logging) System.out.printf("simulation phase %d: after first stable cycle create the next one%n", workPhase.ordinal());
                         } else {
                             workPhase = WorkPhase.FindCycle;
                             mapReadyForMaxSteps = false; // we're not computing this in this phase
                             minCycleStart = cycles;
                             fuPosCol--; // go back to previous cycle
-                            System.out.printf("simulation phase %d: computing first not fully covered cycle%n", workPhase.ordinal());
+                            if (logging) System.out.printf("simulation phase %d: computing first not fully covered cycle%n", workPhase.ordinal());
                         }
                     } else {
                         cycles++;
@@ -598,7 +604,7 @@ public class Day21 extends Day {
                         mapReadyForMaxSteps = false; // we're not computing this in this phase
                         // minCycleStart = cycles;
                         fuPosCol--; // go back to previous cycle
-                        System.out.printf("simulation phase %d: computing first not fully covered cycle%n", workPhase.ordinal());
+                        if (logging) System.out.printf("simulation phase %d: computing first not fully covered cycle%n", workPhase.ordinal());
                         if (true) { // debug: exit immediately
                             earlyExit = true;
                             break;
@@ -612,16 +618,13 @@ public class Day21 extends Day {
                 }
                 case FindCycle: { // one lap along first cycle with all floods stable to compute id of first cycle with partial steps coverage (all cycles before all fully covered)
                     simulationPhase1_MinCycles += minCycleStart - 1;
-                    System.out.printf("simulation phase %d: first not fully covered cycle %d%n", workPhase.ordinal(), simulationPhase1_MinCycles);
-                    if (false) { // debug: force work phase to finish map building without shortcut
+                    if (logging) System.out.printf("simulation phase %d: first not fully covered cycle %d%n", workPhase.ordinal(), simulationPhase1_MinCycles);
+                    if (cycles >= simulationPhase1_MinCycles || false) { // debug: force work phase to finish map building without shortcut
                         workPhase = WorkPhase.Intro;
                         cycles++;
                         continueWork = true;
                         mapReadyForMaxSteps = true;
                         break;
-                    }
-                    if (cycles == simulationPhase1_MinCycles) {
-                        throw new IllegalStateException("not implemented");
                     }
                     if (false) { // debug: exit immediately
                         earlyExit = true;
@@ -640,14 +643,14 @@ public class Day21 extends Day {
                         plotCountReachableInSteps += plotCountForCycle;
                     }
                     cyclePlotCountAdded = plotCountReachableInSteps - cyclePlotCountAdded;
-                    System.out.printf("cycle skipped: floods added %d, plot count increase %d%n", cycleFloodsAdded, cyclePlotCountAdded);
+                    if (logging) System.out.printf("cycle skipped: floods added %d, plot count increase %d%n", cycleFloodsAdded, cyclePlotCountAdded);
                     // move to first cycle with partial steps coverage
                     cycles = simulationPhase1_MinCycles;
                     fuPosCol += simulationPhase1_MinCycles - minCycleStart - 1;
                     break;
                 }
                 case Skip: {
-                    if (true) System.out.println(analysis_DumpFloodUnitMapAsTopLevelMap(floodUnitMap, maxSteps));
+                    if (false) System.out.println(analysis_DumpFloodUnitMapAsTopLevelMap(floodUnitMap, maxSteps));
                     if (false) { // debug: exit immediately
                         earlyExit = true;
                         break;
@@ -685,7 +688,7 @@ public class Day21 extends Day {
                         floodUnit = floodUnitParent.floodStable();
                     }
                 }
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -694,8 +697,8 @@ public class Day21 extends Day {
                 floodUnitPrev = floodUnitParent;
             } else if (workPhase == WorkPhase.FindCycle) {
                 floodUnit = floodUnitMap.get(mapPosCurrent);
-                int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
-                System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                int thisMinCycle = (int)Math.floor((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
+                if (false) if (logging) System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
                 if (simulationPhase1_MinCycles > thisMinCycle) {
                     simulationPhase1_MinCycles = thisMinCycle;
                 }
@@ -712,7 +715,7 @@ public class Day21 extends Day {
                 }
                 floodUnitParent = floodUnitMap.get(mapPosParent);
                 floodUnit = floodUnitParent.floodStable(Math.max(Math.abs(fuPosCol - mapPosParent.getValue0()), Math.abs(fuPosRow - mapPosParent.getValue1()))); // parent is stable, just offset current flood using parent
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 // allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -728,6 +731,11 @@ public class Day21 extends Day {
                 fuPosRow++;
                 if (fuPosCol == 0) {
                     break;
+                }
+                if (logging) if (cycles > 200_000) {
+                    if ((Math.abs(fuPosCol)) % 10_000 == 0) {
+                        System.out.printf("progress: 1st quadrant: current position (%d,%d)%n", fuPosCol, fuPosRow);
+                    }
                 }
                 boolean isDiagonal = Math.abs(fuPosCol) == Math.abs(fuPosRow);
                 mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
@@ -745,7 +753,7 @@ public class Day21 extends Day {
                     //     mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
                     // }
                     // floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
-                    // if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    // if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
                     // floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol - 1, fuPosRow)); // TODO: QUADRANT DEPENDENT
                     // boolean isParentFirstRowCol = Math.abs(mapPosParent.getValue0()) == 1 || Math.abs(mapPosParent.getValue1()) == 1;
                     // boolean stopFloodStable = flag && isParentFirstRowCol;
@@ -758,7 +766,7 @@ public class Day21 extends Day {
                         mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
                     }
                     floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
-                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
                     floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol - 1, fuPosRow)); // TODO: QUADRANT DEPENDENT
                     boolean parentTowardsDiagonalIsDiagonal = Math.abs(mapPosParent.getValue0()) == Math.abs(mapPosParent.getValue1());
                     floodUnit = (isDiagonal || !parentTowardsDiagonalIsDiagonal) && floodUnitParentTowardsDiagonal.isStable ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapRightDown(floodUnitPrev, floodUnitParent, (isDiagonal || !parentTowardsDiagonalIsDiagonal) ? floodUnitParentTowardsDiagonal : null);
@@ -776,8 +784,8 @@ public class Day21 extends Day {
                     floodUnitPrev = floodUnitParent;
                 } else if (workPhase == WorkPhase.FindCycle) {
                     floodUnit = floodUnitMap.get(mapPosCurrent);
-                    int thisMinCycle = (isDiagonal ? 2 : 1) * (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset); // going along diagonal is actually 2 cycles move
-                    System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                    int thisMinCycle = (isDiagonal ? 2 : 1) * (int)Math.floor((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset); // going along diagonal is actually 2 cycles move
+                    if (false) if (logging) System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
                     if (simulationPhase1_MinCycles > thisMinCycle) {
                         simulationPhase1_MinCycles = thisMinCycle;
                     }
@@ -819,7 +827,7 @@ public class Day21 extends Day {
                                 GardenGrid.FloodUnit floodUnitDiagonalPrev = floodUnitMap.get(new Pair<>(fuPosDiagonalCol - deltaCol, fuPosDiagonalRow - deltaRow));
                                 floodUnitParentTowardsDiagonal = floodUnitDiagonalPrev.floodStable();
                                 floodUnitMap.put(mapPosParent, floodUnitParentTowardsDiagonal);
-                                if (storeParents) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
+                                if (storeParentFloods) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
                             } else {
                                 floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
                             }
@@ -827,12 +835,12 @@ public class Day21 extends Day {
                             floodUnitParent = floodUnitParentTowardsDiagonal.floodStableHalf();
                             mapPosParent = new Pair<>(fuPosDiagonalCol + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? deltaCol : 0), fuPosDiagonalRow + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? 0 : deltaRow));
                             floodUnitMap.put(mapPosParent, floodUnitParent);
-                            if (storeParents) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                            if (storeParentFloods) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
                             floodCounter = simulationPhase1_MinCycles - (Math.abs(mapPosParent.getValue0()) + Math.abs(mapPosParent.getValue1()));
                         }
                     }
                     floodUnit = floodUnitParent.floodStable(floodCounter);
-                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                    if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                     cycleFloodsAdded++;
                     // allFloodsInCycleStable &= floodUnit.isStable;
                     mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -859,7 +867,7 @@ public class Day21 extends Day {
                         floodUnit = floodUnitParent.floodStable();
                     }
                 }
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -868,8 +876,8 @@ public class Day21 extends Day {
                 floodUnitPrev = floodUnitParent;
             } else if (workPhase == WorkPhase.FindCycle) {
                 floodUnit = floodUnitMap.get(mapPosCurrent);
-                int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
-                System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                int thisMinCycle = (int)Math.floor((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
+                if (false) if (logging) System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
                 if (simulationPhase1_MinCycles > thisMinCycle) {
                     simulationPhase1_MinCycles = thisMinCycle;
                 }
@@ -886,7 +894,7 @@ public class Day21 extends Day {
                 }
                 floodUnitParent = floodUnitMap.get(mapPosParent);
                 floodUnit = floodUnitParent.floodStable(Math.max(Math.abs(fuPosCol - mapPosParent.getValue0()), Math.abs(fuPosRow - mapPosParent.getValue1()))); // parent is stable, just offset current flood using parent
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 // allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -903,6 +911,11 @@ public class Day21 extends Day {
                 if (fuPosRow == 0) {
                     break;
                 }
+                if (logging) if (cycles > 200_000) {
+                    if ((Math.abs(fuPosCol)) % 10_000 == 0) {
+                        System.out.printf("progress: 2nd quadrant: current position (%d,%d)%n", fuPosCol, fuPosRow);
+                    }
+                }
                 boolean isDiagonal = Math.abs(fuPosCol) == Math.abs(fuPosRow);
                 mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
                 if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
@@ -914,7 +927,7 @@ public class Day21 extends Day {
                         mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
                     }
                     floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
-                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
                     floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol, fuPosRow - 1)); // TODO: QUADRANT DEPENDENT
                     boolean parentTowardsDiagonalIsDiagonal = Math.abs(mapPosParent.getValue0()) == Math.abs(mapPosParent.getValue1());
                     floodUnit = (isDiagonal || !parentTowardsDiagonalIsDiagonal) && floodUnitParentTowardsDiagonal.isStable ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapLeftDown(floodUnitParent, floodUnitPrev, (isDiagonal || !parentTowardsDiagonalIsDiagonal) ? floodUnitParentTowardsDiagonal : null);
@@ -926,8 +939,8 @@ public class Day21 extends Day {
                     floodUnitPrev = floodUnitParent;
                 } else if (workPhase == WorkPhase.FindCycle) {
                     floodUnit = floodUnitMap.get(mapPosCurrent);
-                    int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset) * (isDiagonal ? 2 : 1); // going along diagonal is actually 2 cycles move
-                    System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                    int thisMinCycle = (int)Math.floor((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset) * (isDiagonal ? 2 : 1); // going along diagonal is actually 2 cycles move
+                    if (false) if (logging) System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
                     if (simulationPhase1_MinCycles > thisMinCycle) {
                         simulationPhase1_MinCycles = thisMinCycle;
                     }
@@ -969,7 +982,7 @@ public class Day21 extends Day {
                                 GardenGrid.FloodUnit floodUnitDiagonalPrev = floodUnitMap.get(new Pair<>(fuPosDiagonalCol - deltaCol, fuPosDiagonalRow - deltaRow));
                                 floodUnitParentTowardsDiagonal = floodUnitDiagonalPrev.floodStable();
                                 floodUnitMap.put(mapPosParent, floodUnitParentTowardsDiagonal);
-                                if (storeParents) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
+                                if (storeParentFloods) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
                             } else {
                                 floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
                             }
@@ -977,12 +990,12 @@ public class Day21 extends Day {
                             floodUnitParent = floodUnitParentTowardsDiagonal.floodStableHalf();
                             mapPosParent = new Pair<>(fuPosDiagonalCol + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? deltaCol : 0), fuPosDiagonalRow + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? 0 : deltaRow));
                             floodUnitMap.put(mapPosParent, floodUnitParent);
-                            if (storeParents) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                            if (storeParentFloods) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
                             floodCounter = simulationPhase1_MinCycles - (Math.abs(mapPosParent.getValue0()) + Math.abs(mapPosParent.getValue1()));
                         }
                     }
                     floodUnit = floodUnitParent.floodStable(floodCounter);
-                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                    if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                     cycleFloodsAdded++;
                     // allFloodsInCycleStable &= floodUnit.isStable;
                     mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -1009,7 +1022,7 @@ public class Day21 extends Day {
                         floodUnit = floodUnitParent.floodStable();
                     }
                 }
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -1018,8 +1031,8 @@ public class Day21 extends Day {
                 floodUnitPrev = floodUnitParent;
             } else if (workPhase == WorkPhase.FindCycle) {
                 floodUnit = floodUnitMap.get(mapPosCurrent);
-                int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
-                System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                int thisMinCycle = (int)Math.floor((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
+                if (false) if (logging) System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
                 if (simulationPhase1_MinCycles > thisMinCycle) {
                     simulationPhase1_MinCycles = thisMinCycle;
                 }
@@ -1036,7 +1049,7 @@ public class Day21 extends Day {
                 }
                 floodUnitParent = floodUnitMap.get(mapPosParent);
                 floodUnit = floodUnitParent.floodStable(Math.max(Math.abs(fuPosCol - mapPosParent.getValue0()), Math.abs(fuPosRow - mapPosParent.getValue1()))); // parent is stable, just offset current flood using parent
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 // allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -1053,6 +1066,11 @@ public class Day21 extends Day {
                 if (fuPosCol == 0) {
                     break;
                 }
+                if (logging) if (cycles > 200_000) {
+                    if ((Math.abs(fuPosCol)) % 10_000 == 0) {
+                        System.out.printf("progress: 3rd quadrant: current position (%d,%d)%n", fuPosCol, fuPosRow);
+                    }
+                }
                 boolean isDiagonal = Math.abs(fuPosCol) == Math.abs(fuPosRow);
                 mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
                 if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
@@ -1064,7 +1082,7 @@ public class Day21 extends Day {
                         mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
                     }
                     floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
-                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
                     floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol + 1, fuPosRow)); // TODO: QUADRANT DEPENDENT
                     boolean parentTowardsDiagonalIsDiagonal = Math.abs(mapPosParent.getValue0()) == Math.abs(mapPosParent.getValue1());
                     floodUnit = (isDiagonal || !parentTowardsDiagonalIsDiagonal) && floodUnitParentTowardsDiagonal.isStable ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapLeftUp(floodUnitPrev, floodUnitParent, (isDiagonal || !parentTowardsDiagonalIsDiagonal) ? floodUnitParentTowardsDiagonal : null);
@@ -1076,8 +1094,8 @@ public class Day21 extends Day {
                     floodUnitPrev = floodUnitParent;
                 } else if (workPhase == WorkPhase.FindCycle) {
                     floodUnit = floodUnitMap.get(mapPosCurrent);
-                    int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset) * (isDiagonal ? 2 : 1); // going along diagonal is actually 2 cycles move
-                    System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                    int thisMinCycle = (int)Math.floor((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset) * (isDiagonal ? 2 : 1); // going along diagonal is actually 2 cycles move
+                    if (false) if (logging) System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
                     if (simulationPhase1_MinCycles > thisMinCycle) {
                         simulationPhase1_MinCycles = thisMinCycle;
                     }
@@ -1119,7 +1137,7 @@ public class Day21 extends Day {
                                 GardenGrid.FloodUnit floodUnitDiagonalPrev = floodUnitMap.get(new Pair<>(fuPosDiagonalCol - deltaCol, fuPosDiagonalRow - deltaRow));
                                 floodUnitParentTowardsDiagonal = floodUnitDiagonalPrev.floodStable();
                                 floodUnitMap.put(mapPosParent, floodUnitParentTowardsDiagonal);
-                                if (storeParents) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
+                                if (storeParentFloods) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
                             } else {
                                 floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
                             }
@@ -1127,12 +1145,12 @@ public class Day21 extends Day {
                             floodUnitParent = floodUnitParentTowardsDiagonal.floodStableHalf();
                             mapPosParent = new Pair<>(fuPosDiagonalCol + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? deltaCol : 0), fuPosDiagonalRow + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? 0 : deltaRow));
                             floodUnitMap.put(mapPosParent, floodUnitParent);
-                            if (storeParents) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                            if (storeParentFloods) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
                             floodCounter = simulationPhase1_MinCycles - (Math.abs(mapPosParent.getValue0()) + Math.abs(mapPosParent.getValue1()));
                         }
                     }
                     floodUnit = floodUnitParent.floodStable(floodCounter);
-                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                    if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                     cycleFloodsAdded++;
                     // allFloodsInCycleStable &= floodUnit.isStable;
                     mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -1159,7 +1177,7 @@ public class Day21 extends Day {
                         floodUnit = floodUnitParent.floodStable();
                     }
                 }
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -1168,8 +1186,8 @@ public class Day21 extends Day {
                 floodUnitPrev = floodUnitParent;
             } else if (workPhase == WorkPhase.FindCycle) {
                 floodUnit = floodUnitMap.get(mapPosCurrent);
-                int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
-                System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                int thisMinCycle = (int)Math.floor((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
+                if (false) if (logging) System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
                 if (simulationPhase1_MinCycles > thisMinCycle) {
                     simulationPhase1_MinCycles = thisMinCycle;
                 }
@@ -1186,7 +1204,7 @@ public class Day21 extends Day {
                 }
                 floodUnitParent = floodUnitMap.get(mapPosParent);
                 floodUnit = floodUnitParent.floodStable(Math.max(Math.abs(fuPosCol - mapPosParent.getValue0()), Math.abs(fuPosRow - mapPosParent.getValue1()))); // parent is stable, just offset current flood using parent
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 // allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -1203,6 +1221,11 @@ public class Day21 extends Day {
                 if (fuPosRow == 0) {
                     break;
                 }
+                if (logging) if (cycles > 200_000) {
+                    if ((Math.abs(fuPosCol)) % 10_000 == 0) {
+                        System.out.printf("progress: 4th quadrant: current position (%d,%d)%n", fuPosCol, fuPosRow);
+                    }
+                }
                 boolean isDiagonal = Math.abs(fuPosCol) == Math.abs(fuPosRow);
                 mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
                 if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
@@ -1214,7 +1237,7 @@ public class Day21 extends Day {
                         mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
                     }
                     floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
-                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
                     floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol, fuPosRow + 1)); // TODO: QUADRANT DEPENDENT
                     boolean parentTowardsDiagonalIsDiagonal = Math.abs(mapPosParent.getValue0()) == Math.abs(mapPosParent.getValue1());
                     floodUnit = (isDiagonal || !parentTowardsDiagonalIsDiagonal) && floodUnitParentTowardsDiagonal.isStable ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapRightUp(floodUnitParent, floodUnitPrev, (isDiagonal || !parentTowardsDiagonalIsDiagonal) ? floodUnitParentTowardsDiagonal : null);
@@ -1226,8 +1249,8 @@ public class Day21 extends Day {
                     floodUnitPrev = floodUnitParent;
                 } else if (workPhase == WorkPhase.FindCycle) {
                     floodUnit = floodUnitMap.get(mapPosCurrent);
-                    int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset) * (isDiagonal ? 2 : 1); // going along diagonal is actually 2 cycles move
-                    System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                    int thisMinCycle = (int)Math.floor((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset) * (isDiagonal ? 2 : 1); // going along diagonal is actually 2 cycles move
+                    if (false) if (logging) System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
                     if (simulationPhase1_MinCycles > thisMinCycle) {
                         simulationPhase1_MinCycles = thisMinCycle;
                     }
@@ -1269,7 +1292,7 @@ public class Day21 extends Day {
                                 GardenGrid.FloodUnit floodUnitDiagonalPrev = floodUnitMap.get(new Pair<>(fuPosDiagonalCol - deltaCol, fuPosDiagonalRow - deltaRow));
                                 floodUnitParentTowardsDiagonal = floodUnitDiagonalPrev.floodStable();
                                 floodUnitMap.put(mapPosParent, floodUnitParentTowardsDiagonal);
-                                if (storeParents) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
+                                if (storeParentFloods) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
                             } else {
                                 floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
                             }
@@ -1277,12 +1300,12 @@ public class Day21 extends Day {
                             floodUnitParent = floodUnitParentTowardsDiagonal.floodStableHalf();
                             mapPosParent = new Pair<>(fuPosDiagonalCol + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? deltaCol : 0), fuPosDiagonalRow + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? 0 : deltaRow));
                             floodUnitMap.put(mapPosParent, floodUnitParent);
-                            if (storeParents) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                            if (storeParentFloods) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
                             floodCounter = simulationPhase1_MinCycles - (Math.abs(mapPosParent.getValue0()) + Math.abs(mapPosParent.getValue1()));
                         }
                     }
                     floodUnit = floodUnitParent.floodStable(floodCounter);
-                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                    if (storeParentFloods) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                     cycleFloodsAdded++;
                     // allFloodsInCycleStable &= floodUnit.isStable;
                     mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
@@ -1298,9 +1321,9 @@ public class Day21 extends Day {
             // goto 1.
             cycleStable |= allFloodsInCycleStable;
             cyclePlotCountAdded = plotCountReachableInSteps - cyclePlotCountAdded;
-            System.out.printf("cycle %d: floods added %d, plot count increase %d, count/flood %f%n", cycles, cycleFloodsAdded, cyclePlotCountAdded, (double)cyclePlotCountAdded/cycleFloodsAdded);
+            if (logging) System.out.printf("cycle %d: floods added %d, plot count increase %d, count/flood %f%n", cycles, cycleFloodsAdded, cyclePlotCountAdded, (double)cyclePlotCountAdded/cycleFloodsAdded);
         }
-        return new ReturnData(maxSteps, plotCountReachableInSteps, floodUnitMap, floodUnitParents, cycles);
+        return new ReturnData(maxSteps, plotCountReachableInSteps, floodUnitMap, floodUnitParents, cycles, !doNotOptimize);
     }
 
     private void analysis(ReturnData data) {
@@ -1313,16 +1336,16 @@ public class Day21 extends Day {
             System.out.printf("max steps %d: cycles %d, plot count %d%n", maxSteps, cycles, plotCountReachableInSteps);
         }
         String filenamePart = "%s_%dx%d".formatted(getInputSuffix(), gardenGrid.getWidth(), gardenGrid.getHeight());
-        if (true) {
+        if (false) {
             String charMap = analysis_DumpFloodUnitMapAsTopLevelMap(floodUnitMap, maxSteps);
             if (true) analysis_SaveToFile("%s_charmap_%d".formatted(filenamePart, maxSteps), charMap);
             if (true) System.out.println(charMap);
         }
-        if (true) {
+        if (false) {
             // dump view of whole garden grid
             String[] dumpTypeName = new String[] {""};
             String gardenForMaxSteps = analysis_DumpFloodUnitMapAsUnifiedMap(floodUnitMap, (coords, fu) -> {
-                if (false) {
+                if (true) {
                     dumpTypeName[0] = "flood";
                     return gardenGrid.debugFloodedGrid(fu, maxSteps).toLines(); // flood view limited to max steps
                 } else {
@@ -1341,7 +1364,12 @@ public class Day21 extends Day {
             if (true) analysis_SaveToFile("%s_%s_maxsteps_%d".formatted(filenamePart, dumpTypeName[0], maxSteps), gardenForMaxSteps);
             if (false) System.out.println(gardenForMaxSteps);
         }
-        if (true) { // verify patchwork using flood on unified map
+        if (false) { // verify patchwork using flood on unified map
+            if (data.optimized) {
+                // flood map has holes, cannot restore unified map
+                ReturnData dataNonOptimized = getPlotCountReachableInSteps(maxSteps, false, true, false);
+                floodUnitMap = dataNonOptimized.floodUnitMap;
+            }
             String gardenForMaxSteps = analysis_DumpFloodUnitMapAsUnifiedMap(floodUnitMap, (coors, fu) ->
                     gardenGrid.createInputFromFloodedGrid(fu).toLines() // creates input file for testing
             );
@@ -1491,6 +1519,14 @@ public class Day21 extends Day {
 
     public static class Day21Test {
         @Test
+        void knownBugs() {
+            var day = new Day21("_sample_twohead_1x1maps");
+            day.parsePart2();
+            assertEquals(3839L, day.getPlotCountReachableInSteps(94, false, false, false));
+            assertEquals(3841L, day.getPlotCountReachableInSteps(94, false, true, false)); // wrong fully covered cycle chosen - 7 instead of 6
+        }
+
+        @Test
         void knownGoodInputs() {
             var day = new Day21("_sample_empty_1x1maps");
             day.parsePart2();
@@ -1522,12 +1558,158 @@ public class Day21 extends Day {
         void solvePart2_main() {
             var day = new Day21("");
             day.parsePart2();
-            assertEquals(0L, day.solvePart2());
+            assertEquals(602259568764234L, day.solvePart2());
         }
     }
 }
 /*
 
-COPY DESCRIPTION HERE
+--- Day 21: Step Counter ---
+
+You manage to catch the airship right as it's dropping someone else off on their all-expenses-paid trip to Desert Island! It even helpfully drops you off near the gardener and his massive farm.
+
+"You got the sand flowing again! Great work! Now we just need to wait until we have enough sand to filter the water for Snow Island and we'll have snow again in no time."
+
+While you wait, one of the Elves that works with the gardener heard how good you are at solving problems and would like your help. He needs to get his steps in for the day, and so he'd like to know which garden plots he can reach with exactly his remaining 64 steps.
+
+He gives you an up-to-date map (your puzzle input) of his starting position (S), garden plots (.), and rocks (#). For example:
+
+...........
+.....###.#.
+.###.##..#.
+..#.#...#..
+....#.#....
+.##..S####.
+.##..#...#.
+.......##..
+.##.#.####.
+.##..##.##.
+...........
+
+The Elf starts at the starting position (S) which also counts as a garden plot. Then, he can take one step north, south, east, or west, but only onto tiles that are garden plots. This would allow him to reach any of the tiles marked O:
+
+...........
+.....###.#.
+.###.##..#.
+..#.#...#..
+....#O#....
+.##.OS####.
+.##..#...#.
+.......##..
+.##.#.####.
+.##..##.##.
+...........
+
+Then, he takes a second step. Since at this point he could be at either tile marked O, his second step would allow him to reach any garden plot that is one step north, south, east, or west of any tile that he could have reached after the first step:
+
+...........
+.....###.#.
+.###.##..#.
+..#.#O..#..
+....#.#....
+.##O.O####.
+.##.O#...#.
+.......##..
+.##.#.####.
+.##..##.##.
+...........
+
+After two steps, he could be at any of the tiles marked O above, including the starting position (either by going north-then-south or by going west-then-east).
+
+A single third step leads to even more possibilities:
+
+...........
+.....###.#.
+.###.##..#.
+..#.#.O.#..
+...O#O#....
+.##.OS####.
+.##O.#...#.
+....O..##..
+.##.#.####.
+.##..##.##.
+...........
+
+He will continue like this until his steps for the day have been exhausted. After a total of 6 steps, he could reach any of the garden plots marked O:
+
+...........
+.....###.#.
+.###.##.O#.
+.O#O#O.O#..
+O.O.#.#.O..
+.##O.O####.
+.##.O#O..#.
+.O.O.O.##..
+.##.#.####.
+.##O.##.##.
+...........
+
+In this example, if the Elf's goal was to get exactly 6 more steps today, he could use them to reach any of 16 garden plots.
+
+However, the Elf actually needs to get 64 steps today, and the map he's handed you is much larger than the example map.
+
+Starting from the garden plot marked S on your map, how many garden plots could the Elf reach in exactly 64 steps?
+
+Your puzzle answer was 3615.
+
+--- Part Two ---
+
+The Elf seems confused by your answer until he realizes his mistake: he was reading from a list of his favorite numbers that are both perfect squares and perfect cubes, not his step counter.
+
+The actual number of steps he needs to get today is exactly 26501365.
+
+He also points out that the garden plots and rocks are set up so that the map repeats infinitely in every direction.
+
+So, if you were to look one additional map-width or map-height out from the edge of the example map above, you would find that it keeps repeating:
+
+.................................
+.....###.#......###.#......###.#.
+.###.##..#..###.##..#..###.##..#.
+..#.#...#....#.#...#....#.#...#..
+....#.#........#.#........#.#....
+.##...####..##...####..##...####.
+.##..#...#..##..#...#..##..#...#.
+.......##.........##.........##..
+.##.#.####..##.#.####..##.#.####.
+.##..##.##..##..##.##..##..##.##.
+.................................
+.................................
+.....###.#......###.#......###.#.
+.###.##..#..###.##..#..###.##..#.
+..#.#...#....#.#...#....#.#...#..
+....#.#........#.#........#.#....
+.##...####..##..S####..##...####.
+.##..#...#..##..#...#..##..#...#.
+.......##.........##.........##..
+.##.#.####..##.#.####..##.#.####.
+.##..##.##..##..##.##..##..##.##.
+.................................
+.................................
+.....###.#......###.#......###.#.
+.###.##..#..###.##..#..###.##..#.
+..#.#...#....#.#...#....#.#...#..
+....#.#........#.#........#.#....
+.##...####..##...####..##...####.
+.##..#...#..##..#...#..##..#...#.
+.......##.........##.........##..
+.##.#.####..##.#.####..##.#.####.
+.##..##.##..##..##.##..##..##.##.
+.................................
+
+This is just a tiny three-map-by-three-map slice of the inexplicably-infinite farm layout; garden plots and rocks repeat as far as you can see. The Elf still starts on the one middle tile marked S, though - every other repeated S is replaced with a normal garden plot (.).
+
+Here are the number of reachable garden plots in this new infinite version of the example map for different numbers of steps:
+
+    In exactly 6 steps, he can still reach 16 garden plots.
+    In exactly 10 steps, he can reach any of 50 garden plots.
+    In exactly 50 steps, he can reach 1594 garden plots.
+    In exactly 100 steps, he can reach 6536 garden plots.
+    In exactly 500 steps, he can reach 167004 garden plots.
+    In exactly 1000 steps, he can reach 668697 garden plots.
+    In exactly 5000 steps, he can reach 16733044 garden plots.
+
+However, the step count the Elf needs is much larger! Starting from the garden plot marked S on your infinite map, how many garden plots could the Elf reach in exactly 26501365 steps?
+
+Your puzzle answer was 602259568764234.
 
  */
