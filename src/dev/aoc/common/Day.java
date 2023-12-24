@@ -151,7 +151,7 @@ public abstract class Day {
 
     private void showTitleAndPrefetchInput() {
         String prefetchInput = inputString();
-        System.out.printf("### Advent of Code %d day %02d, input size %d%n%n", aocYear, aocDay, prefetchInput.length());
+        System.out.printf("### Advent of Code %d day %02d, input \"%s\" size %d%n%n", aocYear, aocDay, inputSuffix, prefetchInput.length());
     }
 
     public void run() {

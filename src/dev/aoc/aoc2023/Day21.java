@@ -22,10 +22,10 @@ public class Day21 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day21("_sample_twohead_1x1maps"));
+        Day.run(() -> new Day21("_sample_1x1maps"));
         // _sample_1x1maps, _sample_3x3maps
-        // _sample_empty_1x1maps
-        // _sample_twohead_1x1maps
+        // _sample_empty_1x1maps - fully symmetric
+        // _sample_twohead_1x1maps - maximally asymmetric
         // _test_1x1maps
         // _test_mixed_1x1maps (creates stable with mixed patterns)
     }
@@ -35,7 +35,7 @@ public class Day21 extends Day {
             super(lines, elementDelimiter, parser, Character.valueOf(' ').getClass());
             // no tests were done for input grids of even dimensions
             if ((getWidth() & 1) == 0 || (getHeight() & 1) == 0) {
-                throw new IllegalArgumentException("input dimension no odd");
+                throw new IllegalArgumentException("input dimension not odd");
             }
             // check for empty border around center
             int borderCount = count((col, row) -> (col == 0 || col == getWidth() - 1) || (row == 0 || row == getHeight() - 1));
@@ -70,7 +70,19 @@ public class Day21 extends Day {
                                 boolean isStable,
                                 int stableOffset, int stableCounter) {
             public FloodUnit floodStable() {
-                return new FloodUnit(floodedGrid, minSteps + stableOffset, maxSteps + stableOffset, isStable, stableOffset, stableCounter + 1);
+                return floodStable(1);
+            }
+            public FloodUnit floodStable(int counterDelta) {
+                if (!isStable) {
+                    throw new IllegalStateException("not stable");
+                }
+                return new FloodUnit(floodedGrid, minSteps + counterDelta * stableOffset, maxSteps + counterDelta * stableOffset, isStable, stableOffset, stableCounter + counterDelta);
+            }
+            public FloodUnit floodStableHalf() {
+                if (!isStable) {
+                    throw new IllegalStateException("not stable");
+                }
+                return new FloodUnit(floodedGrid, minSteps + stableOffset / 2, maxSteps + stableOffset / 2, isStable, stableOffset / 2, 2 * stableCounter + 1);
             }
             public int get(int col, int row) {
                 return stableTransform(floodedGrid.get(col, row));
@@ -85,6 +97,18 @@ public class Day21 extends Day {
             /** True if for given steps this flood is fully covered (implies that it's achievable) */
             public boolean isFullyCoveredBy(int steps) {
                 return maxSteps <= steps;
+            }
+            public boolean equalsStable(FloodUnit that) {
+                if (minSteps != that.minSteps || maxSteps != that.maxSteps || floodedGrid.getWidth() != that.floodedGrid.getWidth() || floodedGrid.getHeight() != that.floodedGrid.getHeight()) {
+                    return false;
+                }
+                int countDifferent = floodedGrid.count((col, row) -> floodedGrid.get(col, row) != that.floodedGrid.get(col, row));
+                return countDifferent > 0;
+            }
+
+            @Override
+            public String toString() {
+                return "<%s[%d,%d]|%s>".formatted(isStable ? "%d*%d|".formatted(stableOffset, stableCounter) : "", minSteps, maxSteps, floodedGrid.toString());
             }
         }
 
@@ -455,8 +479,12 @@ public class Day21 extends Day {
 
     private void parse() {
         var mapStrings = stream().collect(Collectors.toList());
+        parse(mapStrings);
+    }
+    private void parse(List<String> mapStrings) {
         gardenGrid = new GardenGrid(mapStrings, "", s -> s.charAt(0));
         System.out.printf("garden grid %d x %d, hash %d%n", gardenGrid.getWidth(), gardenGrid.getHeight(), gardenGrid.hashCode());
+        System.out.printf("garden grid: reachable: even %d, odd %d%n", gardenGrid.allReachableNonStoneEven, gardenGrid.allReachableNonStoneOdd);
     }
 
     @SolutionParser(partNumber = 1)
@@ -467,7 +495,7 @@ public class Day21 extends Day {
     @SolutionSolver(partNumber = 1)
     public Object solvePart1() {
         if (true) return null;
-        int maxSteps = 500;//getInputSuffix().isEmpty() ? 64 : 6;
+        int maxSteps = 1000;//getInputSuffix().isEmpty() ? 64 : 6;
         // long resultNaive = gardenGrid.getPlotCountReachableInSteps(maxSteps);
         // // return resultNaive;
         GardenGrid.FloodUnit flooded = gardenGrid.flood();
@@ -497,239 +525,773 @@ public class Day21 extends Day {
         // IntStream.range(1, 101).forEach(maxSteps -> {
         //     System.out.printf("max steps %d: plot count %d%n", maxSteps, getPlotCountReachableInSteps(maxSteps));
         // });
-        int maxSteps = 74;//26501365
-        plotCountReachableInSteps = getPlotCountReachableInSteps(maxSteps);
+        int maxSteps = 100;//26501365
+        ReturnData result = getPlotCountReachableInSteps(maxSteps);
+        analysis(result);
+        plotCountReachableInSteps = result.plotCountReachableInSteps;
         return plotCountReachableInSteps;
     }
 
-    private long getPlotCountReachableInSteps(int maxSteps) {
+    private record ReturnData(
+            int maxSteps,
+            long plotCountReachableInSteps,
+            Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitMap,
+            Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitParents,
+            long cycles
+    ) {}
+
+    private enum WorkPhase { Intro, Intro2ndCircle, FindCycle, Skip, Finish }
+    private ReturnData getPlotCountReachableInSteps(int maxSteps) {
         long plotCountReachableInSteps = 0;
         // create grid of floods going CW from pos (1,0) making ever bigger circles around origin
         Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitMap = new HashMap<>();
         Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitParents = new HashMap<>();
         final boolean storeParents = true;
         GardenGrid.FloodUnit floodUnit = gardenGrid.flood();
-        boolean mapReadyForMaxSteps = maxSteps < floodUnit.minSteps;
+        boolean mapReadyForMaxSteps = !floodUnit.isAchievableIn(maxSteps);
         plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
         floodUnitMap.put(new Pair<>(0, 0), floodUnit);
         int cycles = 0;
         Pair<Integer, Integer> mapPosParent, mapPosCurrent;
         int fuPosCol = 1, fuPosRow = 0;
-        GardenGrid.FloodUnit floodUnitPrev, floodUnitParent, floodUnitParentTowardsDiagonal;
+        GardenGrid.FloodUnit floodUnitPrev = null, floodUnitParent, floodUnitParentTowardsDiagonal;
         boolean cycleStable = false;
         long cycleFloodsAdded, cyclePlotCountAdded;
+        WorkPhase workPhase = WorkPhase.Intro;
+        int simulationPhase1_MinCycles = Integer.MAX_VALUE;
+        int minCycleStart = 0;
+        boolean continueWork = true;
         while (!mapReadyForMaxSteps) {
-            boolean canSimulateInsteadOfWork = cycleStable && (cycles & 1) == 0; // all floods stable (constant difference with respect to parent) and stable diagonal is in circle
-            cycles++;
-            mapReadyForMaxSteps = true;
+            boolean canSkip = cycleStable;// && (cycles & 1) == 0; // all floods stable (constant difference with respect to parent) and stable diagonal is in circle
+            boolean earlyExit = false;
+            switch (workPhase) {
+                case Intro: {
+                    if (!continueWork && canSkip) {
+                        if (false) {
+                            workPhase = WorkPhase.Intro2ndCircle;
+                            minCycleStart = cycles;
+                            cycles++;
+                            mapReadyForMaxSteps = true;
+                            cycleStable = false;
+                            System.out.printf("simulation phase %d: after first stable cycle create the next one%n", workPhase.ordinal());
+                        } else {
+                            workPhase = WorkPhase.FindCycle;
+                            mapReadyForMaxSteps = false; // we're not computing this in this phase
+                            minCycleStart = cycles;
+                            fuPosCol--; // go back to previous cycle
+                            System.out.printf("simulation phase %d: computing first not fully covered cycle%n", workPhase.ordinal());
+                        }
+                    } else {
+                        cycles++;
+                        mapReadyForMaxSteps = true;
+                        if (cycles > 8)
+                        if (false) { // debug: exit immediately
+                            earlyExit = true;
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case Intro2ndCircle: { // Intro - normal operation, generate floods and put them on map
+                    if (canSkip) {
+                        workPhase = WorkPhase.FindCycle;
+                        mapReadyForMaxSteps = false; // we're not computing this in this phase
+                        // minCycleStart = cycles;
+                        fuPosCol--; // go back to previous cycle
+                        System.out.printf("simulation phase %d: computing first not fully covered cycle%n", workPhase.ordinal());
+                        if (true) { // debug: exit immediately
+                            earlyExit = true;
+                            break;
+                        }
+                    } else {
+                        // throw new IllegalStateException("second cycle after first stable must also be stable");
+                        cycles++;
+                        mapReadyForMaxSteps = true;
+                    }
+                    break;
+                }
+                case FindCycle: { // one lap along first cycle with all floods stable to compute id of first cycle with partial steps coverage (all cycles before all fully covered)
+                    simulationPhase1_MinCycles += minCycleStart - 1;
+                    System.out.printf("simulation phase %d: first not fully covered cycle %d%n", workPhase.ordinal(), simulationPhase1_MinCycles);
+                    if (false) { // debug: force work phase to finish map building without shortcut
+                        workPhase = WorkPhase.Intro;
+                        cycles++;
+                        continueWork = true;
+                        mapReadyForMaxSteps = true;
+                        break;
+                    }
+                    if (cycles == simulationPhase1_MinCycles) {
+                        throw new IllegalStateException("not implemented");
+                    }
+                    if (false) { // debug: exit immediately
+                        earlyExit = true;
+                        break;
+                    }
+                    // skip fully covered cycles and enter next simulation step (first partially covered cycle)
+                    workPhase = WorkPhase.Skip;
+                    // add plot counts for every skipped cycle
+                    cycleFloodsAdded = 0;
+                    cyclePlotCountAdded = plotCountReachableInSteps;
+                    for (int skipCycle = cycles + 1; skipCycle < simulationPhase1_MinCycles; skipCycle++) {
+                        int floodsAdded = skipCycle * 4;
+                        cycleFloodsAdded += floodsAdded;
+                        int plotCountPerFlood = ((skipCycle & 1) == ((maxSteps - 1) & 1)) ? gardenGrid.allReachableNonStoneOdd : gardenGrid.allReachableNonStoneEven;
+                        long plotCountForCycle = (long)floodsAdded * plotCountPerFlood;
+                        plotCountReachableInSteps += plotCountForCycle;
+                    }
+                    cyclePlotCountAdded = plotCountReachableInSteps - cyclePlotCountAdded;
+                    System.out.printf("cycle skipped: floods added %d, plot count increase %d%n", cycleFloodsAdded, cyclePlotCountAdded);
+                    // move to first cycle with partial steps coverage
+                    cycles = simulationPhase1_MinCycles;
+                    fuPosCol += simulationPhase1_MinCycles - minCycleStart - 1;
+                    break;
+                }
+                case Skip: {
+                    if (true) System.out.println(analysis_DumpFloodUnitMapAsTopLevelMap(floodUnitMap, maxSteps));
+                    if (false) { // debug: exit immediately
+                        earlyExit = true;
+                        break;
+                    }
+                    workPhase = WorkPhase.Intro;
+                    cycles++;
+                    continueWork = true;
+                    mapReadyForMaxSteps = true;
+                    break;
+                }
+                default: {
+                    throw new IllegalStateException("illegal simulation phase %d".formatted(workPhase.ordinal()));
+                }
+            }
+            if (earlyExit) {
+                System.out.println("early exit");
+                break;
+            }
             boolean allFloodsInCycleStable = true;
             cycleFloodsAdded = 0;
             cyclePlotCountAdded = plotCountReachableInSteps;
             // 1. at the beginning of the cycle position is (col>0,0): flood right
             mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
-            mapPosParent = new Pair<>(fuPosCol - 1, fuPosRow);
-            floodUnitParent = floodUnitMap.get(mapPosParent);
-            if (floodUnitParent.isStable) {
-                floodUnit = floodUnitParent.floodStable(); // if parent is stable just offset current flood using parent
-            } else {
-                floodUnit = gardenGrid.floodAdjacentMapRight(floodUnitParent); // generate new flood using parent
-                if (floodUnit.isStable) {
-                    // if generated flood is stable, it means that parent is also stable, update parent and recreate current flood using stable parent
-                    floodUnitParent = new GardenGrid.FloodUnit(floodUnitParent.floodedGrid, floodUnitParent.minSteps, floodUnitParent.maxSteps, true, floodUnit.stableOffset, 0);
-                    floodUnitMap.put(mapPosParent, floodUnitParent);
-                    floodUnit = floodUnitParent.floodStable();
-                }
-            }
-            if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
-            cycleFloodsAdded++;
-            allFloodsInCycleStable &= floodUnit.isStable;
-            mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
-            plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
-            floodUnitMap.put(mapPosCurrent, floodUnit);
-            floodUnitPrev = floodUnitParent;
-            // 2. go row+1,col-1 flooding diagonally until col==0 with position (0,row>0)
-            while (fuPosCol > 0) {
-                fuPosCol--;
-                fuPosRow++;
-                if (fuPosCol == 0) {
-                    break;
-                }
-                mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
-                if (Math.abs(fuPosCol) == Math.abs(fuPosRow)) {
-                    mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
-                } else if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
-                    mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow); // (c>0,+-r)->(c-1,+-r) | (c<0,+-r)->(c+1,+-r) - one step along COL axis towards origin
+            if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
+                mapPosParent = new Pair<>(fuPosCol - 1, fuPosRow); // TODO: QUADRANT DEPENDENT
+                floodUnitParent = floodUnitMap.get(mapPosParent);
+                if (floodUnitParent.isStable) {
+                    floodUnit = floodUnitParent.floodStable(); // if parent is stable just offset current flood using parent
                 } else {
-                    mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
-                }
-                floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
-                if (false) {
-                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
-                    floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol - 1, fuPosRow));
-                    floodUnit = floodUnitParentTowardsDiagonal.isStable && Math.abs(mapPosParent.getValue0()) != Math.abs(mapPosParent.getValue1()) ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapRightDown(floodUnitPrev, floodUnitParent, floodUnitParentTowardsDiagonal);
-                }
-                if (floodUnitParentTowardsDiagonal.isStable && Math.abs(mapPosParent.getValue0()) != Math.abs(mapPosParent.getValue1())) {
-                    floodUnit = floodUnitParentTowardsDiagonal.floodStable(); // if parent is stable just offset current flood using parent
-                } else {
-                    floodUnit = gardenGrid.floodAdjacentMapRightDown(floodUnitPrev, floodUnitParent, floodUnitParentTowardsDiagonal); // generate new flood using parent
-                    if (floodUnit.isStable && Math.abs(mapPosParent.getValue0()) != Math.abs(mapPosParent.getValue1())) {
+                    floodUnit = gardenGrid.floodAdjacentMapRight(floodUnitParent); // generate new flood using parent
+                    if (floodUnit.isStable) {
                         // if generated flood is stable, it means that parent is also stable, update parent and recreate current flood using stable parent
                         floodUnitParent = new GardenGrid.FloodUnit(floodUnitParent.floodedGrid, floodUnitParent.minSteps, floodUnitParent.maxSteps, true, floodUnit.stableOffset, 0);
                         floodUnitMap.put(mapPosParent, floodUnitParent);
                         floodUnit = floodUnitParent.floodStable();
                     }
                 }
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
                 plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
                 floodUnitMap.put(mapPosCurrent, floodUnit);
                 floodUnitPrev = floodUnitParent;
+            } else if (workPhase == WorkPhase.FindCycle) {
+                floodUnit = floodUnitMap.get(mapPosCurrent);
+                int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
+                System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                if (simulationPhase1_MinCycles > thisMinCycle) {
+                    simulationPhase1_MinCycles = thisMinCycle;
+                }
+            } else if (workPhase == WorkPhase.Skip) {
+                int deltaCol = fuPosCol == 0 ? 0 : (fuPosCol < 0 ? -1 : 1), deltaRow = fuPosRow == 0 ? 0 : (fuPosRow < 0 ? -1 : 1);
+                // search along axis for first missing flood, parent will be right before it
+                int fuPosParentCol = 0, fuPosParentRow = 0;
+                Pair<Integer, Integer> mapPosParentNext;
+                mapPosParent = null;
+                while (floodUnitMap.containsKey(mapPosParentNext = new Pair<>(fuPosParentCol, fuPosParentRow))) {
+                    mapPosParent = mapPosParentNext;
+                    fuPosParentCol += deltaCol;
+                    fuPosParentRow += deltaRow;
+                }
+                floodUnitParent = floodUnitMap.get(mapPosParent);
+                floodUnit = floodUnitParent.floodStable(Math.max(Math.abs(fuPosCol - mapPosParent.getValue0()), Math.abs(fuPosRow - mapPosParent.getValue1()))); // parent is stable, just offset current flood using parent
+                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                cycleFloodsAdded++;
+                // allFloodsInCycleStable &= floodUnit.isStable;
+                mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                floodUnitMap.put(mapPosCurrent, floodUnit);
+                // floodUnitPrev = floodUnitParent;
+            } else {
+                throw new IllegalStateException("simulation phase %d not implemented".formatted(workPhase.ordinal()));
+            }
+            // 2. go row+1,col-1 flooding diagonally until col==0 with position (0,row>0)
+            while (fuPosCol > 0) {
+                fuPosCol--; // TODO: QUADRANT DEPENDENT
+                fuPosRow++;
+                if (fuPosCol == 0) {
+                    break;
+                }
+                boolean isDiagonal = Math.abs(fuPosCol) == Math.abs(fuPosRow);
+                mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
+                if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
+                    // failed attempt for stable diamond
+                    // boolean flag = false;
+                    // if (isDiagonal) {
+                    //     mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                    // } else if (Math.abs(fuPosCol) == 1) {
+                    //     mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
+                    // } else if (Math.abs(fuPosRow) == 1) {
+                    //     mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow); // (c>0,+-r)->(c-1,+-r) | (c<0,+-r)->(c+1,+-r) - one step along COL axis towards origin
+                    // } else {
+                    //     flag = true;
+                    //     mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                    // }
+                    // floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
+                    // if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    // floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol - 1, fuPosRow)); // TODO: QUADRANT DEPENDENT
+                    // boolean isParentFirstRowCol = Math.abs(mapPosParent.getValue0()) == 1 || Math.abs(mapPosParent.getValue1()) == 1;
+                    // boolean stopFloodStable = flag && isParentFirstRowCol;
+                    // floodUnit = !stopFloodStable && floodUnitParentTowardsDiagonal.isStable ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapRightDown(floodUnitPrev, floodUnitParent, floodUnitParentTowardsDiagonal);
+                    if (isDiagonal) {
+                        mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                    } else if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                        mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow); // (c>0,+-r)->(c-1,+-r) | (c<0,+-r)->(c+1,+-r) - one step along COL axis towards origin
+                    } else {
+                        mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
+                    }
+                    floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
+                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol - 1, fuPosRow)); // TODO: QUADRANT DEPENDENT
+                    boolean parentTowardsDiagonalIsDiagonal = Math.abs(mapPosParent.getValue0()) == Math.abs(mapPosParent.getValue1());
+                    floodUnit = (isDiagonal || !parentTowardsDiagonalIsDiagonal) && floodUnitParentTowardsDiagonal.isStable ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapRightDown(floodUnitPrev, floodUnitParent, (isDiagonal || !parentTowardsDiagonalIsDiagonal) ? floodUnitParentTowardsDiagonal : null);
+                    if (!isDiagonal && parentTowardsDiagonalIsDiagonal) {
+                        // GardenGrid.FloodUnit floodUnitParentOther = floodUnitMap.get(new Pair<>(fuPosCol + (mapPosParent.getValue1() - fuPosRow), fuPosRow + (mapPosParent.getValue0() - fuPosCol)));
+                        GardenGrid.FloodUnit floodUnitParentOther = floodUnitMap.get(new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)));
+                        Grid<Integer> floodedDifference = gardenGrid.floodDifference(floodUnit, floodUnitParentOther);
+                        int tmp = floodedDifference.get(0, 0);
+                    }
+                    cycleFloodsAdded++;
+                    allFloodsInCycleStable &= floodUnit.isStable;
+                    mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                    plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                    floodUnitMap.put(mapPosCurrent, floodUnit);
+                    floodUnitPrev = floodUnitParent;
+                } else if (workPhase == WorkPhase.FindCycle) {
+                    floodUnit = floodUnitMap.get(mapPosCurrent);
+                    int thisMinCycle = (isDiagonal ? 2 : 1) * (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset); // going along diagonal is actually 2 cycles move
+                    System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                    if (simulationPhase1_MinCycles > thisMinCycle) {
+                        simulationPhase1_MinCycles = thisMinCycle;
+                    }
+                } else if (workPhase == WorkPhase.Skip) {
+                    int floodCounter = 0;
+                    int deltaCol = fuPosCol == 0 ? 0 : (fuPosCol < 0 ? -1 : 1), deltaRow = fuPosRow == 0 ? 0 : (fuPosRow < 0 ? -1 : 1);
+                    if (isDiagonal) {
+                        mapPosParent = new Pair<>(fuPosCol - deltaCol, fuPosRow - deltaRow); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                        floodUnitParent = floodUnitMap.get(mapPosParent); // it was created during first octant sweep of this quadrant
+                        floodCounter = 1;
+                    } else {
+                        // go along diagonal until row/col (depending on octant) of current is hit
+                        int fuPosColDiagonalStop, fuPosRowDiagonalStop;
+                        if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                            fuPosColDiagonalStop = Integer.MAX_VALUE;
+                            fuPosRowDiagonalStop = fuPosRow;
+                        } else {
+                            fuPosColDiagonalStop = fuPosCol;
+                            fuPosRowDiagonalStop = Integer.MAX_VALUE;
+                        }
+                        int fuPosDiagonalCol = 0, fuPosDiagonalRow = 0;
+                        while (Math.abs(fuPosDiagonalCol) < Math.abs(fuPosColDiagonalStop) && Math.abs(fuPosDiagonalRow) < Math.abs(fuPosRowDiagonalStop)) {
+                            fuPosDiagonalCol += deltaCol;
+                            fuPosDiagonalRow += deltaRow;
+                        }
+                        if (Math.abs(fuPosDiagonalCol) + Math.abs(fuPosDiagonalRow) < minCycleStart) {
+                            // if current position row/col hits last cycle below middle point then jump to border of the last cycle
+                            if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                                mapPosParent = new Pair<>(deltaCol * (minCycleStart - Math.abs(fuPosDiagonalCol)), fuPosRow);
+                            } else {
+                                mapPosParent = new Pair<>(fuPosCol, deltaRow * (minCycleStart - Math.abs(fuPosDiagonalRow)));
+                            }
+                            floodUnitParent = floodUnitMap.get(mapPosParent); // it was created during first octant sweep of this quadrant
+                            floodCounter = simulationPhase1_MinCycles - minCycleStart;
+                        } else {
+                            mapPosParent = new Pair<>(fuPosDiagonalCol, fuPosDiagonalRow);
+                            if (!floodUnitMap.containsKey(mapPosParent)) {
+                                // if current position row/col hits diagonal above last cycle then create this diagonal flood and store on the map
+                                GardenGrid.FloodUnit floodUnitDiagonalPrev = floodUnitMap.get(new Pair<>(fuPosDiagonalCol - deltaCol, fuPosDiagonalRow - deltaRow));
+                                floodUnitParentTowardsDiagonal = floodUnitDiagonalPrev.floodStable();
+                                floodUnitMap.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                                if (storeParents) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
+                            } else {
+                                floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
+                            }
+                            // create flood based on diagonal towards current position (hack: uses half of stable flood offset instead of intermediate floods, diagonal stable flood is double the axis-parallel stable flood)
+                            floodUnitParent = floodUnitParentTowardsDiagonal.floodStableHalf();
+                            mapPosParent = new Pair<>(fuPosDiagonalCol + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? deltaCol : 0), fuPosDiagonalRow + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? 0 : deltaRow));
+                            floodUnitMap.put(mapPosParent, floodUnitParent);
+                            if (storeParents) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                            floodCounter = simulationPhase1_MinCycles - (Math.abs(mapPosParent.getValue0()) + Math.abs(mapPosParent.getValue1()));
+                        }
+                    }
+                    floodUnit = floodUnitParent.floodStable(floodCounter);
+                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                    cycleFloodsAdded++;
+                    // allFloodsInCycleStable &= floodUnit.isStable;
+                    mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                    plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                    floodUnitMap.put(mapPosCurrent, floodUnit);
+                    // floodUnitPrev = floodUnitParent;
+                } else {
+                    throw new IllegalStateException("simulation phase %d not implemented".formatted(workPhase.ordinal()));
+                }
             }
             // 3. at pos (0,row>0): flood down
             mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
-            mapPosParent = new Pair<>(fuPosCol, fuPosRow - 1);
-            floodUnitParent = floodUnitMap.get(mapPosParent);
-            if (floodUnitParent.isStable) {
-                floodUnit = floodUnitParent.floodStable(); // if parent is stable just offset current flood using parent
-            } else {
-                floodUnit = gardenGrid.floodAdjacentMapDown(floodUnitParent); // generate new flood using parent
-                if (floodUnit.isStable) {
-                    // if generated flood is stable, it means that parent is also stable, update parent and recreate current flood using stable parent
-                    floodUnitParent = new GardenGrid.FloodUnit(floodUnitParent.floodedGrid, floodUnitParent.minSteps, floodUnitParent.maxSteps, true, floodUnit.stableOffset, 0);
-                    floodUnitMap.put(mapPosParent, floodUnitParent);
-                    floodUnit = floodUnitParent.floodStable();
+            if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
+                mapPosParent = new Pair<>(fuPosCol, fuPosRow - 1); // TODO: QUADRANT DEPENDENT
+                floodUnitParent = floodUnitMap.get(mapPosParent);
+                if (floodUnitParent.isStable) {
+                    floodUnit = floodUnitParent.floodStable(); // if parent is stable just offset current flood using parent
+                } else {
+                    floodUnit = gardenGrid.floodAdjacentMapDown(floodUnitParent); // generate new flood using parent
+                    if (floodUnit.isStable) {
+                        // if generated flood is stable, it means that parent is also stable, update parent and recreate current flood using stable parent
+                        floodUnitParent = new GardenGrid.FloodUnit(floodUnitParent.floodedGrid, floodUnitParent.minSteps, floodUnitParent.maxSteps, true, floodUnit.stableOffset, 0);
+                        floodUnitMap.put(mapPosParent, floodUnitParent);
+                        floodUnit = floodUnitParent.floodStable();
+                    }
                 }
+                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                cycleFloodsAdded++;
+                allFloodsInCycleStable &= floodUnit.isStable;
+                mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                floodUnitMap.put(mapPosCurrent, floodUnit);
+                floodUnitPrev = floodUnitParent;
+            } else if (workPhase == WorkPhase.FindCycle) {
+                floodUnit = floodUnitMap.get(mapPosCurrent);
+                int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
+                System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                if (simulationPhase1_MinCycles > thisMinCycle) {
+                    simulationPhase1_MinCycles = thisMinCycle;
+                }
+            } else if (workPhase == WorkPhase.Skip) {
+                int deltaCol = fuPosCol == 0 ? 0 : (fuPosCol < 0 ? -1 : 1), deltaRow = fuPosRow == 0 ? 0 : (fuPosRow < 0 ? -1 : 1);
+                // search along axis for first missing flood, parent will be right before it
+                int fuPosParentCol = 0, fuPosParentRow = 0;
+                Pair<Integer, Integer> mapPosParentNext;
+                mapPosParent = null;
+                while (floodUnitMap.containsKey(mapPosParentNext = new Pair<>(fuPosParentCol, fuPosParentRow))) {
+                    mapPosParent = mapPosParentNext;
+                    fuPosParentCol += deltaCol;
+                    fuPosParentRow += deltaRow;
+                }
+                floodUnitParent = floodUnitMap.get(mapPosParent);
+                floodUnit = floodUnitParent.floodStable(Math.max(Math.abs(fuPosCol - mapPosParent.getValue0()), Math.abs(fuPosRow - mapPosParent.getValue1()))); // parent is stable, just offset current flood using parent
+                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                cycleFloodsAdded++;
+                // allFloodsInCycleStable &= floodUnit.isStable;
+                mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                floodUnitMap.put(mapPosCurrent, floodUnit);
+                // floodUnitPrev = floodUnitParent;
+            } else {
+                throw new IllegalStateException("simulation phase %d not implemented".formatted(workPhase.ordinal()));
             }
-            if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
-            cycleFloodsAdded++;
-            allFloodsInCycleStable &= floodUnit.isStable;
-            mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
-            plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
-            floodUnitMap.put(mapPosCurrent, floodUnit);
-            floodUnitPrev = floodUnitParent;
             // 4. go row-1,col-1 flooding diagonally until row==0 with position (col<0,0)
             while (fuPosRow > 0) {
-                fuPosCol--;
+                fuPosCol--; // TODO: QUADRANT DEPENDENT
                 fuPosRow--;
                 if (fuPosRow == 0) {
                     break;
                 }
+                boolean isDiagonal = Math.abs(fuPosCol) == Math.abs(fuPosRow);
                 mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
-                if (Math.abs(fuPosCol) == Math.abs(fuPosRow)) {
-                    mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
-                } else if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
-                    mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow); // (c>0,+-r)->(c-1,+-r) | (c<0,+-r)->(c+1,+-r) - one step along COL axis towards origin
+                if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
+                    if (isDiagonal) {
+                        mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                    } else if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                        mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow); // (c>0,+-r)->(c-1,+-r) | (c<0,+-r)->(c+1,+-r) - one step along COL axis towards origin
+                    } else {
+                        mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
+                    }
+                    floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
+                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol, fuPosRow - 1)); // TODO: QUADRANT DEPENDENT
+                    boolean parentTowardsDiagonalIsDiagonal = Math.abs(mapPosParent.getValue0()) == Math.abs(mapPosParent.getValue1());
+                    floodUnit = (isDiagonal || !parentTowardsDiagonalIsDiagonal) && floodUnitParentTowardsDiagonal.isStable ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapLeftDown(floodUnitParent, floodUnitPrev, (isDiagonal || !parentTowardsDiagonalIsDiagonal) ? floodUnitParentTowardsDiagonal : null);
+                    cycleFloodsAdded++;
+                    allFloodsInCycleStable &= floodUnit.isStable;
+                    mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                    plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                    floodUnitMap.put(mapPosCurrent, floodUnit);
+                    floodUnitPrev = floodUnitParent;
+                } else if (workPhase == WorkPhase.FindCycle) {
+                    floodUnit = floodUnitMap.get(mapPosCurrent);
+                    int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset) * (isDiagonal ? 2 : 1); // going along diagonal is actually 2 cycles move
+                    System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                    if (simulationPhase1_MinCycles > thisMinCycle) {
+                        simulationPhase1_MinCycles = thisMinCycle;
+                    }
+                } else if (workPhase == WorkPhase.Skip) {
+                    int floodCounter = 0;
+                    int deltaCol = fuPosCol == 0 ? 0 : (fuPosCol < 0 ? -1 : 1), deltaRow = fuPosRow == 0 ? 0 : (fuPosRow < 0 ? -1 : 1);
+                    if (isDiagonal) {
+                        mapPosParent = new Pair<>(fuPosCol - deltaCol, fuPosRow - deltaRow); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                        floodUnitParent = floodUnitMap.get(mapPosParent); // it was created during first octant sweep of this quadrant
+                        floodCounter = 1;
+                    } else {
+                        // go along diagonal until row/col (depending on octant) of current is hit
+                        int fuPosColDiagonalStop, fuPosRowDiagonalStop;
+                        if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                            fuPosColDiagonalStop = Integer.MAX_VALUE;
+                            fuPosRowDiagonalStop = fuPosRow;
+                        } else {
+                            fuPosColDiagonalStop = fuPosCol;
+                            fuPosRowDiagonalStop = Integer.MAX_VALUE;
+                        }
+                        int fuPosDiagonalCol = 0, fuPosDiagonalRow = 0;
+                        while (Math.abs(fuPosDiagonalCol) < Math.abs(fuPosColDiagonalStop) && Math.abs(fuPosDiagonalRow) < Math.abs(fuPosRowDiagonalStop)) {
+                            fuPosDiagonalCol += deltaCol;
+                            fuPosDiagonalRow += deltaRow;
+                        }
+                        if (Math.abs(fuPosDiagonalCol) + Math.abs(fuPosDiagonalRow) < minCycleStart) {
+                            // if current position row/col hits last cycle below middle point then jump to border of the last cycle
+                            if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                                mapPosParent = new Pair<>(deltaCol * (minCycleStart - Math.abs(fuPosDiagonalCol)), fuPosRow);
+                            } else {
+                                mapPosParent = new Pair<>(fuPosCol, deltaRow * (minCycleStart - Math.abs(fuPosDiagonalRow)));
+                            }
+                            floodUnitParent = floodUnitMap.get(mapPosParent); // it was created during first octant sweep of this quadrant
+                            floodCounter = simulationPhase1_MinCycles - minCycleStart;
+                        } else {
+                            mapPosParent = new Pair<>(fuPosDiagonalCol, fuPosDiagonalRow);
+                            if (!floodUnitMap.containsKey(mapPosParent)) {
+                                // if current position row/col hits diagonal above last cycle then create this diagonal flood and store on the map
+                                GardenGrid.FloodUnit floodUnitDiagonalPrev = floodUnitMap.get(new Pair<>(fuPosDiagonalCol - deltaCol, fuPosDiagonalRow - deltaRow));
+                                floodUnitParentTowardsDiagonal = floodUnitDiagonalPrev.floodStable();
+                                floodUnitMap.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                                if (storeParents) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
+                            } else {
+                                floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
+                            }
+                            // create flood based on diagonal towards current position (hack: uses half of stable flood offset instead of intermediate floods, diagonal stable flood is double the axis-parallel stable flood)
+                            floodUnitParent = floodUnitParentTowardsDiagonal.floodStableHalf();
+                            mapPosParent = new Pair<>(fuPosDiagonalCol + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? deltaCol : 0), fuPosDiagonalRow + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? 0 : deltaRow));
+                            floodUnitMap.put(mapPosParent, floodUnitParent);
+                            if (storeParents) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                            floodCounter = simulationPhase1_MinCycles - (Math.abs(mapPosParent.getValue0()) + Math.abs(mapPosParent.getValue1()));
+                        }
+                    }
+                    floodUnit = floodUnitParent.floodStable(floodCounter);
+                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                    cycleFloodsAdded++;
+                    // allFloodsInCycleStable &= floodUnit.isStable;
+                    mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                    plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                    floodUnitMap.put(mapPosCurrent, floodUnit);
+                    // floodUnitPrev = floodUnitParent;
                 } else {
-                    mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
+                    throw new IllegalStateException("simulation phase %d not implemented".formatted(workPhase.ordinal()));
                 }
-                floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
-                floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol, fuPosRow - 1));
-                floodUnit = floodUnitParentTowardsDiagonal.isStable && Math.abs(mapPosParent.getValue0()) != Math.abs(mapPosParent.getValue1()) ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapLeftDown(floodUnitParent, floodUnitPrev, floodUnitParentTowardsDiagonal);
+            }
+            // 5. at pos (col<0,0): flood left
+            mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
+            if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
+                mapPosParent = new Pair<>(fuPosCol + 1, fuPosRow); // TODO: QUADRANT DEPENDENT
+                floodUnitParent = floodUnitMap.get(mapPosParent);
+                if (floodUnitParent.isStable) {
+                    floodUnit = floodUnitParent.floodStable(); // if parent is stable just offset current flood using parent
+                } else {
+                    floodUnit = gardenGrid.floodAdjacentMapLeft(floodUnitParent); // generate new flood using parent
+                    if (floodUnit.isStable) {
+                        // if generated flood is stable, it means that parent is also stable, update parent and recreate current flood using stable parent
+                        floodUnitParent = new GardenGrid.FloodUnit(floodUnitParent.floodedGrid, floodUnitParent.minSteps, floodUnitParent.maxSteps, true, floodUnit.stableOffset, 0);
+                        floodUnitMap.put(mapPosParent, floodUnitParent);
+                        floodUnit = floodUnitParent.floodStable();
+                    }
+                }
+                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
                 plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
                 floodUnitMap.put(mapPosCurrent, floodUnit);
                 floodUnitPrev = floodUnitParent;
-            }
-            // 5. at pos (col<0,0): flood left
-            mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
-            mapPosParent = new Pair<>(fuPosCol + 1, fuPosRow);
-            floodUnitParent = floodUnitMap.get(mapPosParent);
-            if (floodUnitParent.isStable) {
-                floodUnit = floodUnitParent.floodStable(); // if parent is stable just offset current flood using parent
-            } else {
-                floodUnit = gardenGrid.floodAdjacentMapLeft(floodUnitParent); // generate new flood using parent
-                if (floodUnit.isStable) {
-                    // if generated flood is stable, it means that parent is also stable, update parent and recreate current flood using stable parent
-                    floodUnitParent = new GardenGrid.FloodUnit(floodUnitParent.floodedGrid, floodUnitParent.minSteps, floodUnitParent.maxSteps, true, floodUnit.stableOffset, 0);
-                    floodUnitMap.put(mapPosParent, floodUnitParent);
-                    floodUnit = floodUnitParent.floodStable();
+            } else if (workPhase == WorkPhase.FindCycle) {
+                floodUnit = floodUnitMap.get(mapPosCurrent);
+                int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
+                System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                if (simulationPhase1_MinCycles > thisMinCycle) {
+                    simulationPhase1_MinCycles = thisMinCycle;
                 }
+            } else if (workPhase == WorkPhase.Skip) {
+                int deltaCol = fuPosCol == 0 ? 0 : (fuPosCol < 0 ? -1 : 1), deltaRow = fuPosRow == 0 ? 0 : (fuPosRow < 0 ? -1 : 1);
+                // search along axis for first missing flood, parent will be right before it
+                int fuPosParentCol = 0, fuPosParentRow = 0;
+                Pair<Integer, Integer> mapPosParentNext;
+                mapPosParent = null;
+                while (floodUnitMap.containsKey(mapPosParentNext = new Pair<>(fuPosParentCol, fuPosParentRow))) {
+                    mapPosParent = mapPosParentNext;
+                    fuPosParentCol += deltaCol;
+                    fuPosParentRow += deltaRow;
+                }
+                floodUnitParent = floodUnitMap.get(mapPosParent);
+                floodUnit = floodUnitParent.floodStable(Math.max(Math.abs(fuPosCol - mapPosParent.getValue0()), Math.abs(fuPosRow - mapPosParent.getValue1()))); // parent is stable, just offset current flood using parent
+                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                cycleFloodsAdded++;
+                // allFloodsInCycleStable &= floodUnit.isStable;
+                mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                floodUnitMap.put(mapPosCurrent, floodUnit);
+                // floodUnitPrev = floodUnitParent;
+            } else {
+                throw new IllegalStateException("simulation phase %d not implemented".formatted(workPhase.ordinal()));
             }
-            if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
-            cycleFloodsAdded++;
-            allFloodsInCycleStable &= floodUnit.isStable;
-            mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
-            plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
-            floodUnitMap.put(mapPosCurrent, floodUnit);
-            floodUnitPrev = floodUnitParent;
             // 6. go row-1,col+1 flooding diagonally until col==0 with position (0,row<0)
             while (fuPosCol < 0) {
-                fuPosCol++;
+                fuPosCol++; // TODO: QUADRANT DEPENDENT
                 fuPosRow--;
                 if (fuPosCol == 0) {
                     break;
                 }
+                boolean isDiagonal = Math.abs(fuPosCol) == Math.abs(fuPosRow);
                 mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
-                if (Math.abs(fuPosCol) == Math.abs(fuPosRow)) {
-                    mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
-                } else if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
-                    mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow); // (c>0,+-r)->(c-1,+-r) | (c<0,+-r)->(c+1,+-r) - one step along COL axis towards origin
+                if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
+                    if (isDiagonal) {
+                        mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                    } else if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                        mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow); // (c>0,+-r)->(c-1,+-r) | (c<0,+-r)->(c+1,+-r) - one step along COL axis towards origin
+                    } else {
+                        mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
+                    }
+                    floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
+                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol + 1, fuPosRow)); // TODO: QUADRANT DEPENDENT
+                    boolean parentTowardsDiagonalIsDiagonal = Math.abs(mapPosParent.getValue0()) == Math.abs(mapPosParent.getValue1());
+                    floodUnit = (isDiagonal || !parentTowardsDiagonalIsDiagonal) && floodUnitParentTowardsDiagonal.isStable ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapLeftUp(floodUnitPrev, floodUnitParent, (isDiagonal || !parentTowardsDiagonalIsDiagonal) ? floodUnitParentTowardsDiagonal : null);
+                    cycleFloodsAdded++;
+                    allFloodsInCycleStable &= floodUnit.isStable;
+                    mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                    plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                    floodUnitMap.put(mapPosCurrent, floodUnit);
+                    floodUnitPrev = floodUnitParent;
+                } else if (workPhase == WorkPhase.FindCycle) {
+                    floodUnit = floodUnitMap.get(mapPosCurrent);
+                    int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset) * (isDiagonal ? 2 : 1); // going along diagonal is actually 2 cycles move
+                    System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                    if (simulationPhase1_MinCycles > thisMinCycle) {
+                        simulationPhase1_MinCycles = thisMinCycle;
+                    }
+                } else if (workPhase == WorkPhase.Skip) {
+                    int floodCounter = 0;
+                    int deltaCol = fuPosCol == 0 ? 0 : (fuPosCol < 0 ? -1 : 1), deltaRow = fuPosRow == 0 ? 0 : (fuPosRow < 0 ? -1 : 1);
+                    if (isDiagonal) {
+                        mapPosParent = new Pair<>(fuPosCol - deltaCol, fuPosRow - deltaRow); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                        floodUnitParent = floodUnitMap.get(mapPosParent); // it was created during first octant sweep of this quadrant
+                        floodCounter = 1;
+                    } else {
+                        // go along diagonal until row/col (depending on octant) of current is hit
+                        int fuPosColDiagonalStop, fuPosRowDiagonalStop;
+                        if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                            fuPosColDiagonalStop = Integer.MAX_VALUE;
+                            fuPosRowDiagonalStop = fuPosRow;
+                        } else {
+                            fuPosColDiagonalStop = fuPosCol;
+                            fuPosRowDiagonalStop = Integer.MAX_VALUE;
+                        }
+                        int fuPosDiagonalCol = 0, fuPosDiagonalRow = 0;
+                        while (Math.abs(fuPosDiagonalCol) < Math.abs(fuPosColDiagonalStop) && Math.abs(fuPosDiagonalRow) < Math.abs(fuPosRowDiagonalStop)) {
+                            fuPosDiagonalCol += deltaCol;
+                            fuPosDiagonalRow += deltaRow;
+                        }
+                        if (Math.abs(fuPosDiagonalCol) + Math.abs(fuPosDiagonalRow) < minCycleStart) {
+                            // if current position row/col hits last cycle below middle point then jump to border of the last cycle
+                            if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                                mapPosParent = new Pair<>(deltaCol * (minCycleStart - Math.abs(fuPosDiagonalCol)), fuPosRow);
+                            } else {
+                                mapPosParent = new Pair<>(fuPosCol, deltaRow * (minCycleStart - Math.abs(fuPosDiagonalRow)));
+                            }
+                            floodUnitParent = floodUnitMap.get(mapPosParent); // it was created during first octant sweep of this quadrant
+                            floodCounter = simulationPhase1_MinCycles - minCycleStart;
+                        } else {
+                            mapPosParent = new Pair<>(fuPosDiagonalCol, fuPosDiagonalRow);
+                            if (!floodUnitMap.containsKey(mapPosParent)) {
+                                // if current position row/col hits diagonal above last cycle then create this diagonal flood and store on the map
+                                GardenGrid.FloodUnit floodUnitDiagonalPrev = floodUnitMap.get(new Pair<>(fuPosDiagonalCol - deltaCol, fuPosDiagonalRow - deltaRow));
+                                floodUnitParentTowardsDiagonal = floodUnitDiagonalPrev.floodStable();
+                                floodUnitMap.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                                if (storeParents) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
+                            } else {
+                                floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
+                            }
+                            // create flood based on diagonal towards current position (hack: uses half of stable flood offset instead of intermediate floods, diagonal stable flood is double the axis-parallel stable flood)
+                            floodUnitParent = floodUnitParentTowardsDiagonal.floodStableHalf();
+                            mapPosParent = new Pair<>(fuPosDiagonalCol + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? deltaCol : 0), fuPosDiagonalRow + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? 0 : deltaRow));
+                            floodUnitMap.put(mapPosParent, floodUnitParent);
+                            if (storeParents) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                            floodCounter = simulationPhase1_MinCycles - (Math.abs(mapPosParent.getValue0()) + Math.abs(mapPosParent.getValue1()));
+                        }
+                    }
+                    floodUnit = floodUnitParent.floodStable(floodCounter);
+                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                    cycleFloodsAdded++;
+                    // allFloodsInCycleStable &= floodUnit.isStable;
+                    mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                    plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                    floodUnitMap.put(mapPosCurrent, floodUnit);
+                    // floodUnitPrev = floodUnitParent;
                 } else {
-                    mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
+                    throw new IllegalStateException("simulation phase %d not implemented".formatted(workPhase.ordinal()));
                 }
-                floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
-                floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol + 1, fuPosRow));
-                floodUnit = floodUnitParentTowardsDiagonal.isStable && Math.abs(mapPosParent.getValue0()) != Math.abs(mapPosParent.getValue1()) ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapLeftUp(floodUnitPrev, floodUnitParent, floodUnitParentTowardsDiagonal);
+            }
+            // 7. at pos (0,row<0): flood up
+            mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
+            if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
+                mapPosParent = new Pair<>(fuPosCol, fuPosRow + 1); // TODO: QUADRANT DEPENDENT
+                floodUnitParent = floodUnitMap.get(mapPosParent);
+                if (floodUnitParent.isStable) {
+                    floodUnit = floodUnitParent.floodStable(); // if parent is stable just offset current flood using parent
+                } else {
+                    floodUnit = gardenGrid.floodAdjacentMapUp(floodUnitParent); // generate new flood using parent
+                    if (floodUnit.isStable) {
+                        // if generated flood is stable, it means that parent is also stable, update parent and recreate current flood using stable parent
+                        floodUnitParent = new GardenGrid.FloodUnit(floodUnitParent.floodedGrid, floodUnitParent.minSteps, floodUnitParent.maxSteps, true, floodUnit.stableOffset, 0);
+                        floodUnitMap.put(mapPosParent, floodUnitParent);
+                        floodUnit = floodUnitParent.floodStable();
+                    }
+                }
+                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
                 cycleFloodsAdded++;
                 allFloodsInCycleStable &= floodUnit.isStable;
                 mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
                 plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
                 floodUnitMap.put(mapPosCurrent, floodUnit);
                 floodUnitPrev = floodUnitParent;
-            }
-            // 7. at pos (0,row<0): flood up
-            mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
-            mapPosParent = new Pair<>(fuPosCol, fuPosRow + 1);
-            floodUnitParent = floodUnitMap.get(mapPosParent);
-            if (floodUnitParent.isStable) {
-                floodUnit = floodUnitParent.floodStable(); // if parent is stable just offset current flood using parent
-            } else {
-                floodUnit = gardenGrid.floodAdjacentMapUp(floodUnitParent); // generate new flood using parent
-                if (floodUnit.isStable) {
-                    // if generated flood is stable, it means that parent is also stable, update parent and recreate current flood using stable parent
-                    floodUnitParent = new GardenGrid.FloodUnit(floodUnitParent.floodedGrid, floodUnitParent.minSteps, floodUnitParent.maxSteps, true, floodUnit.stableOffset, 0);
-                    floodUnitMap.put(mapPosParent, floodUnitParent);
-                    floodUnit = floodUnitParent.floodStable();
+            } else if (workPhase == WorkPhase.FindCycle) {
+                floodUnit = floodUnitMap.get(mapPosCurrent);
+                int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset);
+                System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                if (simulationPhase1_MinCycles > thisMinCycle) {
+                    simulationPhase1_MinCycles = thisMinCycle;
                 }
+            } else if (workPhase == WorkPhase.Skip) {
+                int deltaCol = fuPosCol == 0 ? 0 : (fuPosCol < 0 ? -1 : 1), deltaRow = fuPosRow == 0 ? 0 : (fuPosRow < 0 ? -1 : 1);
+                // search along axis for first missing flood, parent will be right before it
+                int fuPosParentCol = 0, fuPosParentRow = 0;
+                Pair<Integer, Integer> mapPosParentNext;
+                mapPosParent = null;
+                while (floodUnitMap.containsKey(mapPosParentNext = new Pair<>(fuPosParentCol, fuPosParentRow))) {
+                    mapPosParent = mapPosParentNext;
+                    fuPosParentCol += deltaCol;
+                    fuPosParentRow += deltaRow;
+                }
+                floodUnitParent = floodUnitMap.get(mapPosParent);
+                floodUnit = floodUnitParent.floodStable(Math.max(Math.abs(fuPosCol - mapPosParent.getValue0()), Math.abs(fuPosRow - mapPosParent.getValue1()))); // parent is stable, just offset current flood using parent
+                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                cycleFloodsAdded++;
+                // allFloodsInCycleStable &= floodUnit.isStable;
+                mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                floodUnitMap.put(mapPosCurrent, floodUnit);
+                // floodUnitPrev = floodUnitParent;
+            } else {
+                throw new IllegalStateException("simulation phase %d not implemented".formatted(workPhase.ordinal()));
             }
-            if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
-            cycleFloodsAdded++;
-            allFloodsInCycleStable &= floodUnit.isStable;
-            mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
-            plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
-            floodUnitMap.put(mapPosCurrent, floodUnit);
-            floodUnitPrev = floodUnitParent;
             // 8. go row+1,col+1 flooding diagonally until row==0 with position (col>0,0)
             while (fuPosRow < 0) {
-                fuPosCol++;
+                fuPosCol++; // TODO: QUADRANT DEPENDENT
                 fuPosRow++;
                 if (fuPosRow == 0) {
                     break;
                 }
+                boolean isDiagonal = Math.abs(fuPosCol) == Math.abs(fuPosRow);
                 mapPosCurrent = new Pair<>(fuPosCol, fuPosRow);
-                if (Math.abs(fuPosCol) == Math.abs(fuPosRow)) {
-                    mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
-                } else if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
-                    mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow); // (c>0,+-r)->(c-1,+-r) | (c<0,+-r)->(c+1,+-r) - one step along COL axis towards origin
+                if (workPhase == WorkPhase.Intro || workPhase == WorkPhase.Intro2ndCircle) {
+                    if (isDiagonal) {
+                        mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                    } else if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                        mapPosParent = new Pair<>(fuPosCol + (fuPosCol < 0 ? 1 : -1), fuPosRow); // (c>0,+-r)->(c-1,+-r) | (c<0,+-r)->(c+1,+-r) - one step along COL axis towards origin
+                    } else {
+                        mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
+                    }
+                    floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
+                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
+                    floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol, fuPosRow + 1)); // TODO: QUADRANT DEPENDENT
+                    boolean parentTowardsDiagonalIsDiagonal = Math.abs(mapPosParent.getValue0()) == Math.abs(mapPosParent.getValue1());
+                    floodUnit = (isDiagonal || !parentTowardsDiagonalIsDiagonal) && floodUnitParentTowardsDiagonal.isStable ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapRightUp(floodUnitParent, floodUnitPrev, (isDiagonal || !parentTowardsDiagonalIsDiagonal) ? floodUnitParentTowardsDiagonal : null);
+                    cycleFloodsAdded++;
+                    allFloodsInCycleStable &= floodUnit.isStable;
+                    mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                    plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                    floodUnitMap.put(mapPosCurrent, floodUnit);
+                    floodUnitPrev = floodUnitParent;
+                } else if (workPhase == WorkPhase.FindCycle) {
+                    floodUnit = floodUnitMap.get(mapPosCurrent);
+                    int thisMinCycle = (int)((double)(maxSteps - floodUnit.minSteps) / floodUnit.stableOffset) * (isDiagonal ? 2 : 1); // going along diagonal is actually 2 cycles move
+                    System.out.printf("simulation phase %d: min cycle %d%n", workPhase.ordinal(), thisMinCycle);
+                    if (simulationPhase1_MinCycles > thisMinCycle) {
+                        simulationPhase1_MinCycles = thisMinCycle;
+                    }
+                } else if (workPhase == WorkPhase.Skip) {
+                    int floodCounter = 0;
+                    int deltaCol = fuPosCol == 0 ? 0 : (fuPosCol < 0 ? -1 : 1), deltaRow = fuPosRow == 0 ? 0 : (fuPosRow < 0 ? -1 : 1);
+                    if (isDiagonal) {
+                        mapPosParent = new Pair<>(fuPosCol - deltaCol, fuPosRow - deltaRow); // (c,r)->(c+-1,r+-1) - diagonally towards origin
+                        floodUnitParent = floodUnitMap.get(mapPosParent); // it was created during first octant sweep of this quadrant
+                        floodCounter = 1;
+                    } else {
+                        // go along diagonal until row/col (depending on octant) of current is hit
+                        int fuPosColDiagonalStop, fuPosRowDiagonalStop;
+                        if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                            fuPosColDiagonalStop = Integer.MAX_VALUE;
+                            fuPosRowDiagonalStop = fuPosRow;
+                        } else {
+                            fuPosColDiagonalStop = fuPosCol;
+                            fuPosRowDiagonalStop = Integer.MAX_VALUE;
+                        }
+                        int fuPosDiagonalCol = 0, fuPosDiagonalRow = 0;
+                        while (Math.abs(fuPosDiagonalCol) < Math.abs(fuPosColDiagonalStop) && Math.abs(fuPosDiagonalRow) < Math.abs(fuPosRowDiagonalStop)) {
+                            fuPosDiagonalCol += deltaCol;
+                            fuPosDiagonalRow += deltaRow;
+                        }
+                        if (Math.abs(fuPosDiagonalCol) + Math.abs(fuPosDiagonalRow) < minCycleStart) {
+                            // if current position row/col hits last cycle below middle point then jump to border of the last cycle
+                            if (Math.abs(fuPosCol) > Math.abs(fuPosRow)) {
+                                mapPosParent = new Pair<>(deltaCol * (minCycleStart - Math.abs(fuPosDiagonalCol)), fuPosRow);
+                            } else {
+                                mapPosParent = new Pair<>(fuPosCol, deltaRow * (minCycleStart - Math.abs(fuPosDiagonalRow)));
+                            }
+                            floodUnitParent = floodUnitMap.get(mapPosParent); // it was created during first octant sweep of this quadrant
+                            floodCounter = simulationPhase1_MinCycles - minCycleStart;
+                        } else {
+                            mapPosParent = new Pair<>(fuPosDiagonalCol, fuPosDiagonalRow);
+                            if (!floodUnitMap.containsKey(mapPosParent)) {
+                                // if current position row/col hits diagonal above last cycle then create this diagonal flood and store on the map
+                                GardenGrid.FloodUnit floodUnitDiagonalPrev = floodUnitMap.get(new Pair<>(fuPosDiagonalCol - deltaCol, fuPosDiagonalRow - deltaRow));
+                                floodUnitParentTowardsDiagonal = floodUnitDiagonalPrev.floodStable();
+                                floodUnitMap.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                                if (storeParents) floodUnitParents.put(mapPosParent, floodUnitDiagonalPrev);
+                            } else {
+                                floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
+                            }
+                            // create flood based on diagonal towards current position (hack: uses half of stable flood offset instead of intermediate floods, diagonal stable flood is double the axis-parallel stable flood)
+                            floodUnitParent = floodUnitParentTowardsDiagonal.floodStableHalf();
+                            mapPosParent = new Pair<>(fuPosDiagonalCol + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? deltaCol : 0), fuPosDiagonalRow + (Math.abs(fuPosCol) > Math.abs(fuPosRow) ? 0 : deltaRow));
+                            floodUnitMap.put(mapPosParent, floodUnitParent);
+                            if (storeParents) floodUnitParents.put(mapPosParent, floodUnitParentTowardsDiagonal);
+                            floodCounter = simulationPhase1_MinCycles - (Math.abs(mapPosParent.getValue0()) + Math.abs(mapPosParent.getValue1()));
+                        }
+                    }
+                    floodUnit = floodUnitParent.floodStable(floodCounter);
+                    if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParent);
+                    cycleFloodsAdded++;
+                    // allFloodsInCycleStable &= floodUnit.isStable;
+                    mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
+                    plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
+                    floodUnitMap.put(mapPosCurrent, floodUnit);
+                    // floodUnitPrev = floodUnitParent;
                 } else {
-                    mapPosParent = new Pair<>(fuPosCol, fuPosRow + (fuPosRow < 0 ? 1 : -1)); // (+-c,r>0)->(+-c,r-1) | (+-c,r<0)->(+-c,r+1) - one step along ROW axis towards origin
+                    throw new IllegalStateException("simulation phase %d not implemented".formatted(workPhase.ordinal()));
                 }
-                floodUnitParentTowardsDiagonal = floodUnitMap.get(mapPosParent);
-                if (storeParents) floodUnitParents.put(mapPosCurrent, floodUnitParentTowardsDiagonal);
-                floodUnitParent = floodUnitMap.get(new Pair<>(fuPosCol, fuPosRow + 1));
-                floodUnit = floodUnitParentTowardsDiagonal.isStable && Math.abs(mapPosParent.getValue0()) != Math.abs(mapPosParent.getValue1()) ? floodUnitParentTowardsDiagonal.floodStable() : gardenGrid.floodAdjacentMapRightUp(floodUnitParent, floodUnitPrev, floodUnitParentTowardsDiagonal);
-                cycleFloodsAdded++;
-                allFloodsInCycleStable &= floodUnit.isStable;
-                mapReadyForMaxSteps &= !floodUnit.isAchievableIn(maxSteps);
-                plotCountReachableInSteps += gardenGrid.getPlotCountReachableInSteps(maxSteps, floodUnit);
-                floodUnitMap.put(mapPosCurrent, floodUnit);
-                floodUnitPrev = floodUnitParent;
             }
             // 9. advance right to next circle
             fuPosCol++;
@@ -738,16 +1300,15 @@ public class Day21 extends Day {
             cyclePlotCountAdded = plotCountReachableInSteps - cyclePlotCountAdded;
             System.out.printf("cycle %d: floods added %d, plot count increase %d, count/flood %f%n", cycles, cycleFloodsAdded, cyclePlotCountAdded, (double)cyclePlotCountAdded/cycleFloodsAdded);
         }
-        analysis(floodUnitMap, maxSteps, floodUnitParents, plotCountReachableInSteps, cycles);
-        return plotCountReachableInSteps;
+        return new ReturnData(maxSteps, plotCountReachableInSteps, floodUnitMap, floodUnitParents, cycles);
     }
 
-    private void analysis(
-            Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitMap,
-            int maxSteps, Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitParents,
-            long plotCountReachableInSteps,
-            long cycles
-    ) {
+    private void analysis(ReturnData data) {
+        int maxSteps = data.maxSteps;
+        long plotCountReachableInSteps = data.plotCountReachableInSteps;
+        Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitMap = data.floodUnitMap;
+        Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitParents = data.floodUnitParents;
+        long cycles = data.cycles;
         if (true) {
             System.out.printf("max steps %d: cycles %d, plot count %d%n", maxSteps, cycles, plotCountReachableInSteps);
         }
@@ -780,7 +1341,7 @@ public class Day21 extends Day {
             if (true) analysis_SaveToFile("%s_%s_maxsteps_%d".formatted(filenamePart, dumpTypeName[0], maxSteps), gardenForMaxSteps);
             if (false) System.out.println(gardenForMaxSteps);
         }
-        if (false) {
+        if (true) { // verify patchwork using flood on unified map
             String gardenForMaxSteps = analysis_DumpFloodUnitMapAsUnifiedMap(floodUnitMap, (coors, fu) ->
                     gardenGrid.createInputFromFloodedGrid(fu).toLines() // creates input file for testing
             );
@@ -826,8 +1387,8 @@ public class Day21 extends Day {
         int minRow = Integer.MAX_VALUE, maxRow = Integer.MIN_VALUE;
         for (var key : floodUnitMap.keySet()) {
             minCol = Math.min(minCol, key.getValue0());
-            maxCol = Math.max(maxCol, key.getValue1());
-            minRow = Math.min(minRow, key.getValue0());
+            maxCol = Math.max(maxCol, key.getValue0());
+            minRow = Math.min(minRow, key.getValue1());
             maxRow = Math.max(maxRow, key.getValue1());
         }
         return new MinMaxBounds(minCol, maxCol, minRow, maxRow);
@@ -835,6 +1396,7 @@ public class Day21 extends Day {
     private String analysis_DumpFloodUnitMapAsTopLevelMap(Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitMap, int maxSteps) {
         // get map min/max coords
         MinMaxBounds mapBounds = analysis_GetMinMaxBoundsFromMapOfEuclideanSpace(floodUnitMap);
+        if (mapBounds.getColRange() == 0 || mapBounds.getRowRange() == 0) return "";
         // convert from map to grid (of chars)
         var charGrid = new Grid<Character>(mapBounds.getColRange(), mapBounds.getRowRange(), '.', "");
         for (var e : floodUnitMap.entrySet()) {
@@ -930,7 +1492,9 @@ public class Day21 extends Day {
     public static class Day21Test {
         @Test
         void knownGoodInputs() {
-
+            var day = new Day21("_sample_empty_1x1maps");
+            day.parsePart2();
+            assertEquals(1002001L, day.getPlotCountReachableInSteps(1000));
         }
 
         @Test
