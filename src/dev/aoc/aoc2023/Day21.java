@@ -22,7 +22,7 @@ public class Day21 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day21(""));
+        Day.run(() -> new Day21("_sample_1x1maps"));
         // _sample_1x1maps, _sample_3x3maps
         // _sample_empty_1x1maps - fully symmetric
         // _sample_twohead_1x1maps - maximally asymmetric
@@ -495,7 +495,7 @@ public class Day21 extends Day {
     @SolutionSolver(partNumber = 1)
     public Object solvePart1() {
         if (true) return null;
-        int maxSteps = 1000;//getInputSuffix().isEmpty() ? 64 : 6;
+        int maxSteps = getInputSuffix().isEmpty() ? 64 : 6;
         // long resultNaive = gardenGrid.getPlotCountReachableInSteps(maxSteps);
         // // return resultNaive;
         GardenGrid.FloodUnit flooded = gardenGrid.flood();
@@ -522,17 +522,20 @@ public class Day21 extends Day {
         5. thus, each flood grid can be easily obtained by adding a constant multiplied by distance from "stable" flood grid from axis or diagonal
          */
         long plotCountReachableInSteps = 0;
-        // IntStream.range(1, 501).forEach(maxSteps -> {
-        //     System.out.printf("max steps %d%n", maxSteps);
-        //     ReturnData result = getPlotCountReachableInSteps(maxSteps, false, false);
-        //     analysis(result);
-        //     System.out.printf("max steps %d: plot count %d%n", maxSteps, result.plotCountReachableInSteps);
-        // });
-        int maxSteps = 26501365;//26501365
+        int maxSteps = getInputSuffix().isEmpty() ? 26501365 : 5000;
         ReturnData result = getPlotCountReachableInSteps(maxSteps, true, false, false);
         analysis(result);
         plotCountReachableInSteps = result.plotCountReachableInSteps;
         return plotCountReachableInSteps;
+    }
+
+    public void debug() {
+        IntStream.range(1, 501).forEach(maxSteps -> {
+            System.out.printf("max steps %d%n", maxSteps);
+            ReturnData result = getPlotCountReachableInSteps(maxSteps, false, false, false);
+            analysis(result);
+            System.out.printf("max steps %d: plot count %d%n", maxSteps, result.plotCountReachableInSteps);
+        });
     }
 
     private record ReturnData(
