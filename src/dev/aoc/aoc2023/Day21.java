@@ -1,9 +1,6 @@
 package dev.aoc.aoc2023;
 
-import dev.aoc.common.Day;
-import dev.aoc.common.Grid;
-import dev.aoc.common.SolutionParser;
-import dev.aoc.common.SolutionSolver;
+import dev.aoc.common.*;
 import org.javatuples.Pair;
 import org.junit.jupiter.api.Test;
 
@@ -494,7 +491,7 @@ public class Day21 extends Day {
 
     @SolutionSolver(partNumber = 1)
     public Object solvePart1() {
-        if (true) return null;
+        // if (true) return null;
         int maxSteps = getInputSuffix().isEmpty() ? 64 : 6;
         // long resultNaive = gardenGrid.getPlotCountReachableInSteps(maxSteps);
         // // return resultNaive;
@@ -588,7 +585,7 @@ public class Day21 extends Day {
                             mapReadyForMaxSteps = false; // we're not computing this in this phase
                             minCycleStart = cycles;
                             fuPosCol--; // go back to previous cycle
-                            if (logging) System.out.printf("simulation phase %d: computing first not fully covered cycle%n", workPhase.ordinal());
+                            if (logging) System.out.printf("simulation phase %d: computing last fully covered cycle%n", workPhase.ordinal());
                         }
                     } else {
                         cycles++;
@@ -601,7 +598,7 @@ public class Day21 extends Day {
                     }
                     break;
                 }
-                case Intro2ndCircle: { // Intro - normal operation, generate floods and put them on map
+                case Intro2ndCircle: { // Intro2ndCircle - TODO REMOVE
                     if (canSkip) {
                         workPhase = WorkPhase.FindCycle;
                         mapReadyForMaxSteps = false; // we're not computing this in this phase
@@ -619,9 +616,9 @@ public class Day21 extends Day {
                     }
                     break;
                 }
-                case FindCycle: { // one lap along first cycle with all floods stable to compute id of first cycle with partial steps coverage (all cycles before all fully covered)
+                case FindCycle: { // one lap along first cycle with all floods stable to compute id of last cycle with full steps coverage (next cycle after is partially covered)
                     simulationPhase1_MinCycles += minCycleStart - 1;
-                    if (logging) System.out.printf("simulation phase %d: first not fully covered cycle %d%n", workPhase.ordinal(), simulationPhase1_MinCycles);
+                    if (logging) System.out.printf("simulation phase %d: last fully covered cycle %d%n", workPhase.ordinal(), simulationPhase1_MinCycles);
                     if (cycles >= simulationPhase1_MinCycles || false) { // debug: force work phase to finish map building without shortcut
                         workPhase = WorkPhase.Intro;
                         cycles++;
@@ -633,7 +630,7 @@ public class Day21 extends Day {
                         earlyExit = true;
                         break;
                     }
-                    // skip fully covered cycles and enter next simulation step (first partially covered cycle)
+                    // skip cycles and enter next simulation step (last fully covered cycle)
                     workPhase = WorkPhase.Skip;
                     // add plot counts for every skipped cycle
                     cycleFloodsAdded = 0;
@@ -647,7 +644,7 @@ public class Day21 extends Day {
                     }
                     cyclePlotCountAdded = plotCountReachableInSteps - cyclePlotCountAdded;
                     if (logging) System.out.printf("cycle skipped: floods added %d, plot count increase %d%n", cycleFloodsAdded, cyclePlotCountAdded);
-                    // move to first cycle with partial steps coverage
+                    // move to last cycle with full steps coverage
                     cycles = simulationPhase1_MinCycles;
                     fuPosCol += simulationPhase1_MinCycles - minCycleStart - 1;
                     break;
@@ -662,6 +659,7 @@ public class Day21 extends Day {
                     cycles++;
                     continueWork = true;
                     mapReadyForMaxSteps = true;
+                    // TODO: after finishing last fully covered cycle check average plot count per flood added, if not from two known values, then stop (or restart) b/c that cycle was not fully covered!
                     break;
                 }
                 default: {
@@ -1404,39 +1402,35 @@ public class Day21 extends Day {
         });
     }
 
-    private record MinMaxBounds(int minCol, int maxCol, int minRow, int maxRow) {
-        public int getColRange() {
-            return maxCol - minCol + 1;
-        }
-        public int getRowRange() {
-            return maxRow - minRow + 1;
-        }
-    }
-    private <T> MinMaxBounds analysis_GetMinMaxBoundsFromMapOfEuclideanSpace(Map<Pair<Integer, Integer>, T> floodUnitMap) {
+    private <T> MinMaxBounds2D analysis_GetMinMaxBoundsFromMapOfEuclideanSpace(Map<Pair<Integer, Integer>, T> floodUnitMap) {
         // get map min/max coords
+        MinMaxBounds2D minMax = new MinMaxBounds2D();
         int minCol = Integer.MAX_VALUE, maxCol = Integer.MIN_VALUE;
         int minRow = Integer.MAX_VALUE, maxRow = Integer.MIN_VALUE;
         for (var key : floodUnitMap.keySet()) {
-            minCol = Math.min(minCol, key.getValue0());
-            maxCol = Math.max(maxCol, key.getValue0());
-            minRow = Math.min(minRow, key.getValue1());
-            maxRow = Math.max(maxRow, key.getValue1());
+            minMax.accX(key.getValue0());
+            minMax.accY(key.getValue1());
+            // minCol = Math.min(minCol, key.getValue0());
+            // maxCol = Math.max(maxCol, key.getValue0());
+            // minRow = Math.min(minRow, key.getValue1());
+            // maxRow = Math.max(maxRow, key.getValue1());
         }
-        return new MinMaxBounds(minCol, maxCol, minRow, maxRow);
+        // return new MinMaxBounds(minCol, maxCol, minRow, maxRow);
+        return minMax;
     }
     private String analysis_DumpFloodUnitMapAsTopLevelMap(Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitMap, int maxSteps) {
         // get map min/max coords
-        MinMaxBounds mapBounds = analysis_GetMinMaxBoundsFromMapOfEuclideanSpace(floodUnitMap);
-        if (mapBounds.getColRange() == 0 || mapBounds.getRowRange() == 0) return "";
+        MinMaxBounds2D mapBounds = analysis_GetMinMaxBoundsFromMapOfEuclideanSpace(floodUnitMap);
+        if (mapBounds.getXRange() == 0 || mapBounds.getYRange() == 0) return "";
         // convert from map to grid (of chars)
-        var charGrid = new Grid<Character>(mapBounds.getColRange(), mapBounds.getRowRange(), '.', "");
+        var charGrid = new Grid<Character>(mapBounds.getXRange(), mapBounds.getYRange(), '.', "");
         for (var e : floodUnitMap.entrySet()) {
             GardenGrid.FloodUnit mapVal = e.getValue();
             boolean isAchievable = mapVal.isAchievableIn(maxSteps);
             boolean isFullyCovered = mapVal.isFullyCoveredBy(maxSteps);
             int chIdx = !isAchievable ? 0 : !isFullyCovered ? 1 : 2;
             char ch = mapVal.isStable ? (mapVal.stableCounter == 0 ? ":sS" : "|pP").charAt(chIdx) : "-+*".charAt(chIdx);
-            charGrid.set(e.getKey().getValue0() - mapBounds.minCol, e.getKey().getValue1() - mapBounds.minRow, ch);
+            charGrid.set(e.getKey().getValue0() - mapBounds.getMinX(), e.getKey().getValue1() - mapBounds.getMinY(), ch);
         }
         return charGrid.toString();
     }
@@ -1444,17 +1438,17 @@ public class Day21 extends Day {
             Map<Pair<Integer, Integer>, GardenGrid.FloodUnit> floodUnitMap,
             BiFunction<Pair<Integer, Integer>, GardenGrid.FloodUnit, List<String>> floodUnitToLines) {
         // get map min/max coords
-        MinMaxBounds mapBounds = analysis_GetMinMaxBoundsFromMapOfEuclideanSpace(floodUnitMap);
+        MinMaxBounds2D mapBounds = analysis_GetMinMaxBoundsFromMapOfEuclideanSpace(floodUnitMap);
         // convert from map to grid (of floods)
         GardenGrid.FloodUnit floodUnitAny = floodUnitMap.values().stream().findFirst().get();
-        var floodUnitGrid = new Grid<GardenGrid.FloodUnit>(mapBounds.getColRange(), mapBounds.getRowRange(), null, floodUnitAny.getClass(), "");
+        var floodUnitGrid = new Grid<GardenGrid.FloodUnit>(mapBounds.getXRange(), mapBounds.getYRange(), null, floodUnitAny.getClass(), "");
         for (var e : floodUnitMap.entrySet()) {
-            floodUnitGrid.set(e.getKey().getValue0() - mapBounds.minCol, e.getKey().getValue1() - mapBounds.minRow, e.getValue());
+            floodUnitGrid.set(e.getKey().getValue0() - mapBounds.getMinX(), e.getKey().getValue1() - mapBounds.getMinY(), e.getValue());
         }
         // convert from grid of floods to grid of list of strings
         var charGridEmpty = new Grid<>(floodUnitAny.floodedGrid.getWidth(), floodUnitAny.floodedGrid.getHeight(), '.', "");
         List<String> emptyGridLines = charGridEmpty.toLines();
-        int finalMinCol = mapBounds.minCol, finalMinRow = mapBounds.minRow;
+        int finalMinCol = mapBounds.getMinX(), finalMinRow = mapBounds.getMinY();
         BiFunction<Pair<Integer, Integer>, GardenGrid.FloodUnit, List<String>> mapFUtoLofS = (coords, gridFU) -> {
             if (gridFU == null) {
                 return emptyGridLines;
