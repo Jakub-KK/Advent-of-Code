@@ -43,7 +43,7 @@ public class Day99 extends Day {
         }
 
         @Test
-        void solvePart1_small() {
+        void solvePart1_sample() {
             var day = new Day99("_sample");
             day.parsePart1();
             assertEquals(0L, day.solvePart1());
@@ -57,7 +57,7 @@ public class Day99 extends Day {
         }
 
         @Test
-        void solvePart2_small() {
+        void solvePart2_sample() {
             var day = new Day99("_sample");
             day.parsePart2();
             assertEquals(0L, day.solvePart2());

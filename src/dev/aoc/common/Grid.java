@@ -178,8 +178,8 @@ public class Grid<T> {
         return result;
     }
 
-    public <R> Grid<R> map(BiFunction<Pair<Integer, Integer>, T, R> mapper, Class<?> elementUClass) {
-        Grid<R> result = new Grid<>(getWidth(), getHeight(), null, elementUClass, elementDelimiter);
+    public <R> Grid<R> map(BiFunction<Pair<Integer, Integer>, T, R> mapper, Class<?> elementRClass) {
+        Grid<R> result = new Grid<>(getWidth(), getHeight(), null, elementRClass, elementDelimiter);
         for (int row = 0; row < height; row++) {
             for (int col = 0; col < width; col++) {
                 result.elements[row][col] = mapper.apply(new Pair<>(col, row), elements[row][col]);
@@ -190,6 +190,14 @@ public class Grid<T> {
 
     public <R> Stream<R> mapLine(Function<T[], R> mapper) {
         return Arrays.stream(elements).map(mapper);
+    }
+
+    public void forEach(BiConsumer<Pair<Integer, Integer>, T> consumer) {
+        for (int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
+                consumer.accept(new Pair<>(col, row), elements[row][col]);
+            }
+        }
     }
 
     public void fill(char fillElement) {
@@ -259,7 +267,8 @@ public class Grid<T> {
         UP(0, -1), NORTH(0, -1),
         DOWN(0, 1), SOUTH(0, 1),
         LEFT(-1, 0), WEST(-1, 0),
-        RIGHT(1, 0), EAST(1, 0);
+        RIGHT(1, 0), EAST(1, 0),
+        UNKNOWN(0, 0);
         public final int dCol;
         public final int dRow;
         Direction(int dCol, int dRow) {
@@ -268,6 +277,19 @@ public class Grid<T> {
         }
         public static Direction[] getAll() {
             return new Direction[] { Direction.UP, Direction.RIGHT, Direction.DOWN, Direction.LEFT };
+        }
+        public Direction reverse() {
+            return switch (this) {
+                case UP -> DOWN;
+                case NORTH -> SOUTH;
+                case DOWN -> UP;
+                case SOUTH -> NORTH;
+                case LEFT -> RIGHT;
+                case WEST -> EAST;
+                case RIGHT -> LEFT;
+                case EAST -> WEST;
+                case UNKNOWN -> UNKNOWN;
+            };
         }
     }
 

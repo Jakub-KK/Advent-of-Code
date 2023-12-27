@@ -35,10 +35,11 @@ public class Day21 extends Day {
                 throw new IllegalArgumentException("input dimension not odd");
             }
             // check for empty border around center
-            int borderCount = count((col, row) -> (col == 0 || col == getWidth() - 1) || (row == 0 || row == getHeight() - 1));
+            int borderCount = count((col, row) -> ((col == 0 || col == getWidth() - 1) || (row == 0 || row == getHeight() - 1)) && is(col, row, '.'));
             if (borderCount != 2 * getWidth() + 2 * getHeight() - 4) {
                 throw new IllegalArgumentException("input border must be empty");
             }
+            startCol = startRow = -1;
             for (int row = 0; row < getHeight(); row++) {
                 for (int col = 0; col < getWidth(); col++) {
                     char cell = get(col, row);
@@ -47,6 +48,9 @@ public class Day21 extends Day {
                         startRow = row;
                     }
                 }
+            }
+            if (startCol < 0) {
+                throw new IllegalArgumentException("missing starting point 'S");
             }
             FloodUnit flooded = flood();
             allReachableNonStoneEven = getPlotCountReachableInStepsNonOptimized(flooded.maxSteps * 2, flooded);
