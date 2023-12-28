@@ -2,16 +2,16 @@ package dev.aoc.common;
 
 import java.util.Objects;
 
-public class MinMaxBounds3D {
-    private final MinMaxBounds x;
-    private final MinMaxBounds y;
-    private final MinMaxBounds z;
+public class MinMaxLongBounds3D {
+    private final MinMaxLongBounds x;
+    private final MinMaxLongBounds y;
+    private final MinMaxLongBounds z;
 
-    public MinMaxBounds3D() {
-        this(new MinMaxBounds(), new MinMaxBounds(), new MinMaxBounds());
+    public MinMaxLongBounds3D() {
+        this(new MinMaxLongBounds(), new MinMaxLongBounds(), new MinMaxLongBounds());
     }
 
-    public MinMaxBounds3D(MinMaxBounds x, MinMaxBounds y, MinMaxBounds z) {
+    public MinMaxLongBounds3D(MinMaxLongBounds x, MinMaxLongBounds y, MinMaxLongBounds z) {
         this.x = x;
         this.y = y;
         this.z = z;
@@ -23,51 +23,51 @@ public class MinMaxBounds3D {
         z.reset();
     }
 
-    public int getXRange() {
+    public long getXRange() {
         return x.getRange();
     }
-    public int getYRange() {
+    public long getYRange() {
         return y.getRange();
     }
-    public int getZRange() {
+    public long getZRange() {
         return z.getRange();
     }
 
-    public void acc(int x, int y, int z) {
+    public void acc(long x, long y, long z) {
         accX(x);
-        accX(y);
-        accX(z);
+        accY(y);
+        accZ(z);
     }
-    public void accX(int value) {
+    public void accX(long value) {
         x.acc(value);
     }
-    public void accY(int value) {
+    public void accY(long value) {
         y.acc(value);
     }
-    public void accZ(int value) {
+    public void accZ(long value) {
         z.acc(value);
     }
 
-    public int getMinX() {
+    public long getMinX() {
         return x.getMin();
     }
-    public int getMaxX() {
+    public long getMaxX() {
         return x.getMax();
     }
-    public int getMinY() {
+    public long getMinY() {
         return y.getMin();
     }
-    public int getMaxY() {
+    public long getMaxY() {
         return y.getMax();
     }
-    public int getMinZ() {
+    public long getMinZ() {
         return z.getMin();
     }
-    public int getMaxZ() {
+    public long getMaxZ() {
         return z.getMax();
     }
 
-    public boolean equals(MinMaxBounds3D that) {
+    public boolean equals(MinMaxLongBounds3D that) {
         return x.equals(that.x) && y.equals(that.y) && z.equals(that.z);
     }
 
@@ -75,7 +75,7 @@ public class MinMaxBounds3D {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        MinMaxBounds3D that = (MinMaxBounds3D) o;
+        MinMaxLongBounds3D that = (MinMaxLongBounds3D) o;
         return Objects.equals(x, that.x) && Objects.equals(y, that.y) && Objects.equals(z, that.z);
     }
 

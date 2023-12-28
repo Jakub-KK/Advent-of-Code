@@ -2,15 +2,15 @@ package dev.aoc.common;
 
 import java.util.Objects;
 
-public class MinMaxBounds2D {
-    private final MinMaxBounds x;
-    private final MinMaxBounds y;
+public class MinMaxLongBounds2D {
+    private final MinMaxLongBounds x;
+    private final MinMaxLongBounds y;
 
-    public MinMaxBounds2D() {
-        this(new MinMaxBounds(), new MinMaxBounds());
+    public MinMaxLongBounds2D() {
+        this(new MinMaxLongBounds(), new MinMaxLongBounds());
     }
 
-    public MinMaxBounds2D(MinMaxBounds x, MinMaxBounds y) {
+    public MinMaxLongBounds2D(MinMaxLongBounds x, MinMaxLongBounds y) {
         this.x = x;
         this.y = y;
     }
@@ -20,42 +20,42 @@ public class MinMaxBounds2D {
         y.reset();
     }
 
-    public int getXRange() {
+    public long getXRange() {
         return x.getRange();
     }
 
-    public int getYRange() {
+    public long getYRange() {
         return y.getRange();
     }
 
-    public void acc(int x, int y) {
+    public void acc(long x, long y) {
         accX(x);
-        accX(y);
+        accY(y);
     }
-    public void accX(int value) {
+    public void accX(long value) {
         x.acc(value);
     }
-    public void accY(int value) {
+    public void accY(long value) {
         y.acc(value);
     }
 
-    public int getMinX() {
+    public long getMinX() {
         return x.getMin();
     }
 
-    public int getMaxX() {
+    public long getMaxX() {
         return x.getMax();
     }
 
-    public int getMinY() {
+    public long getMinY() {
         return y.getMin();
     }
 
-    public int getMaxY() {
+    public long getMaxY() {
         return y.getMax();
     }
 
-    public boolean equals(MinMaxBounds2D that) {
+    public boolean equals(MinMaxLongBounds2D that) {
         return x.equals(that.x) && y.equals(that.y);
     }
 
@@ -63,7 +63,7 @@ public class MinMaxBounds2D {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        MinMaxBounds2D that = (MinMaxBounds2D) o;
+        MinMaxLongBounds2D that = (MinMaxLongBounds2D) o;
         return Objects.equals(x, that.x) && Objects.equals(y, that.y);
     }
 
