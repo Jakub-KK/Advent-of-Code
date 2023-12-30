@@ -1,8 +1,10 @@
 package dev.aoc.common.graphsearch;
 
+import org.javatuples.Pair;
+
 import java.util.*;
 
-public class RouteFinderAStar<T extends GraphNode> {
+public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
     private final Graph<T> graph;
     private final Scorer<T> nextNodeScorer;
     private final Scorer<T> targetScorer;
@@ -13,7 +15,7 @@ public class RouteFinderAStar<T extends GraphNode> {
         this.targetScorer = targetScorer;
     }
 
-    public List<T> findRoute(T from, T to) {
+    public Pair<List<T>, Long> findRoute(T from, T to) {
         Queue<RouteNode<T>> openSet = new PriorityQueue<>();
         Map<T, RouteNode<T>> allNodes = new HashMap<>();
 
@@ -33,16 +35,16 @@ public class RouteFinderAStar<T extends GraphNode> {
                     route.addFirst(routeNode.getCurrent());
                     routeNode = routeNode.getPrevious();
                 } while (routeNode != null);
-                return route;
+                return new Pair<>(route, current.getRouteScore());
             }
 
-            graph.getConnections(currentNode).forEach(connection -> {
-                RouteNode<T> nextNode = allNodes.computeIfAbsent(connection, key -> new RouteNode<>(connection));
-                long newScore = current.getRouteScore() + nextNodeScorer.computeCost(currentNode, connection);
+            graph.getEdges(currentNode).forEach(connNode -> {
+                RouteNode<T> nextNode = allNodes.computeIfAbsent(connNode, key -> new RouteNode<>(connNode));
+                long newScore = current.getRouteScore() + nextNodeScorer.computeCost(currentNode, connNode);
                 if (newScore < nextNode.getRouteScore()) {
                     nextNode.setPrevious(current);
                     nextNode.setRouteScore(newScore);
-                    nextNode.setEstimatedScore(newScore + targetScorer.computeCost(connection, to));
+                    nextNode.setEstimatedScore(newScore + targetScorer.computeCost(connNode, to));
                     if (!openSet.contains(nextNode)) {
                         openSet.add(nextNode);
                     }

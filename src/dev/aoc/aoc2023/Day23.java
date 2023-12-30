@@ -8,11 +8,9 @@ import dev.aoc.common.graphsearch.*;
 import org.javatuples.Pair;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -155,11 +153,11 @@ public class Day23 extends Day {
         }
 
         @Override
-        public abstract Set<PathNode> getConnections(PathNode node);
+        public abstract Set<PathNode> getEdges(PathNode node);
     }
     private class ForestWithoutSlopesGraph extends ForestGraph {
         @Override
-        public Set<PathNode> getConnections(PathNode node) {
+        public Set<PathNode> getEdges(PathNode node) {
             HashSet<PathNode> results = new HashSet<>(4);
             Arrays.stream(Direction.getAll()).forEach(dir -> {
                 Grid.Direction gridDir = dir.toGridDirection();
@@ -194,10 +192,10 @@ public class Day23 extends Day {
     private class CrossingsGraph implements Graph<PathNode> {
         public final PathNode start, end;
         public final Set<PathNode> nodes;
-        public final Map<Pair<PathNode, PathNode>, Integer> connectionWeights;
-        private final Map<PathNode, Set<PathNode>> connections;
+        public final Map<Pair<PathNode, PathNode>, Integer> edgeWeights;
+        private final Map<PathNode, Set<PathNode>> edges;
 
-        public CrossingsGraph(Set<PathNode> nodes, Map<Pair<PathNode, PathNode>, Integer> connectionWeights) {
+        public CrossingsGraph(Set<PathNode> nodes, Map<Pair<PathNode, PathNode>, Integer> edgeWeights) {
             start = new PathNode(forestGrid.startCell.getValue0(), forestGrid.startCell.getValue1());
             if (!nodes.contains(start)) {
                 throw new IllegalArgumentException("start node missing");
@@ -207,18 +205,18 @@ public class Day23 extends Day {
                 throw new IllegalArgumentException("end node missing");
             }
             this.nodes = nodes;
-            this.connectionWeights = connectionWeights;
-            connections = new HashMap<>();
-            for (Pair<PathNode, PathNode> edges : connectionWeights.keySet()) {
-                Set<PathNode> nodeA = connections.computeIfAbsent(edges.getValue0(), key -> new HashSet<>());
+            this.edgeWeights = edgeWeights;
+            edges = new HashMap<>();
+            for (Pair<PathNode, PathNode> edges : edgeWeights.keySet()) {
+                Set<PathNode> nodeA = this.edges.computeIfAbsent(edges.getValue0(), key -> new HashSet<>());
                 nodeA.add(edges.getValue1());
-                Set<PathNode> nodeB = connections.computeIfAbsent(edges.getValue1(), key -> new HashSet<>());
+                Set<PathNode> nodeB = this.edges.computeIfAbsent(edges.getValue1(), key -> new HashSet<>());
                 nodeB.add(edges.getValue0());
             }
-            if (!connections.containsKey(start) || connections.get(start).isEmpty()) {
+            if (!edges.containsKey(start) || edges.get(start).isEmpty()) {
                 throw new IllegalArgumentException("start node not connected to graph");
             }
-            if (!connections.containsKey(end) || connections.get(end).isEmpty()) {
+            if (!edges.containsKey(end) || edges.get(end).isEmpty()) {
                 throw new IllegalArgumentException("end node not connected to graph");
             }
             // System.out.printf("crossings graph nodes %s%n".formatted(String.join(", ", nodes.stream().map(PathNode::toString).toList())));
@@ -234,8 +232,8 @@ public class Day23 extends Day {
         }
 
         @Override
-        public Set<PathNode> getConnections(PathNode node) {
-            return connections.get(node);
+        public Set<PathNode> getEdges(PathNode node) {
+            return edges.get(node);
         }
     }
     private class NextCrossingsPathNodeScorer implements Scorer<PathNode> {
@@ -246,7 +244,7 @@ public class Day23 extends Day {
         @Override
         public long computeCost(PathNode from, PathNode to) {
             boolean isOrdered = from.getId() < to.getId();
-            return graph.connectionWeights.get(new Pair<>(isOrdered ? from : to, isOrdered ? to : from));
+            return graph.edgeWeights.get(new Pair<>(isOrdered ? from : to, isOrdered ? to : from));
         }
     }
     private class TargetEstimateCrossingsPathNodeScorer implements Scorer<PathNode> {
@@ -312,11 +310,11 @@ public class Day23 extends Day {
         }
 
         @Override
-        public abstract Set<PathDirectedNode> getConnections(PathDirectedNode node);
+        public abstract Set<PathDirectedNode> getEdges(PathDirectedNode node);
     }
     private class ForestWithSlopesGraph extends ForestDirectedGraph {
         @Override
-        public Set<PathDirectedNode> getConnections(PathDirectedNode node) {
+        public Set<PathDirectedNode> getEdges(PathDirectedNode node) {
             HashSet<PathDirectedNode> results = new HashSet<>(4);
             Direction nodeDir = node.direction;
             Direction noTurnBackDir = nodeDir.reverse();
@@ -405,7 +403,7 @@ public class Day23 extends Day {
         // input is long stretches of corridors with small number of crossings (marked by slopes, which we ignore in part 2)
         // find all crossings, use search from part 1 to iterate through all paths and create graph with nodes in crossings (plus start/end) and edges with weight of longest corridor between crossings
         ForestGraph forestWithoutSlopesGraph = new ForestWithoutSlopesGraph();
-        Grid<Integer> forestConnDegree = forestGrid.map((coords, symbol) -> symbol == '#' ? 0 : forestWithoutSlopesGraph.getConnections(new PathDirectedNode(coords.getValue0(), coords.getValue1(), Direction.UNKNOWN)).size(), Integer.valueOf(0).getClass());
+        Grid<Integer> forestConnDegree = forestGrid.map((coords, symbol) -> symbol == '#' ? 0 : forestWithoutSlopesGraph.getEdges(new PathDirectedNode(coords.getValue0(), coords.getValue1(), Direction.UNKNOWN)).size(), Integer.valueOf(0).getClass());
         Map<PathNode, PathNode> crossNodes = new HashMap<>();
         crossNodes.put(forestWithoutSlopesGraph.start, forestWithoutSlopesGraph.start);
         crossNodes.put(forestWithoutSlopesGraph.end, forestWithoutSlopesGraph.end);

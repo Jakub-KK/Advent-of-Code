@@ -4,7 +4,7 @@ import org.javatuples.Pair;
 
 import java.util.*;
 
-public class RouteFinderMax<T extends GraphNode> {
+public class RouteFinderMax<T extends GraphNode> implements RouteFinder<T> {
     private final Graph<T> graph;
     private final Scorer<T> nextNodeScorer;
     private final Scorer<T> targetScorer;
@@ -18,7 +18,7 @@ public class RouteFinderMax<T extends GraphNode> {
     private record State<T extends GraphNode>(RouteNode<T> node, List<RouteNode<T>> connections) {}
 
     private State<T> createState(RouteNode<T> node, Map<T, RouteNode<T>> allNodes, T to) {
-        List<RouteNode<T>> connections = graph.getConnections(node.getCurrent()).stream().map(connection -> {
+        List<RouteNode<T>> connections = graph.getEdges(node.getCurrent()).stream().map(connection -> {
             RouteNode<T> nextNode = allNodes.computeIfAbsent(connection, key -> new RouteNode<>(connection));
             if ((node.getPrevious() != null && nextNode.equals(node.getPrevious())) || nextNode.getPrevious() != null) {
                 return null; // skip going back and ignore visited connections
