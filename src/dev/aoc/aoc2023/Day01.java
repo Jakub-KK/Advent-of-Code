@@ -1,17 +1,24 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 
-public class Day01 extends Day {
-    public static void main(String[] args) {
-        new Day01("").run(); // _small1, _small2
-    }
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class Day01 extends Day {
     public Day01(String inputSuffix) {
         super(inputSuffix);
     }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day01("_sample1")); // _sample1, _sample2
+    }
+
+    private record SpeltDigit(String name, int stride) {}
 
     private final SpeltDigit[] sdigits = {
             null,
@@ -26,9 +33,13 @@ public class Day01 extends Day {
             new SpeltDigit("nine", 3)
     };
 
-    @Override
-    protected Object solvePart1() {
-        int result = stream()
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
+    }
+
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
+        long result = stream()
                 .mapToInt(line -> {
                     var digits = new ArrayList<Integer>();
                     int pos = 0;
@@ -49,14 +60,17 @@ public class Day01 extends Day {
                     }
                     return number;
                 })
-                .sum()
-                ;
+                .sum();
         return result;
     }
 
-    @Override
-    protected Object solvePart2() {
-        int result = stream()
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+    }
+
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
+        long result = stream()
                 .mapToInt(line -> {
                     var digits = new ArrayList<Integer>();
                     int pos = 0;
@@ -129,12 +143,39 @@ public class Day01 extends Day {
                     int number = firstDigit * 10 + secondDigit;
                     return number;
                 })
-                .sum()
-                ;
+                .sum();
         return result;
     }
 
-    private record SpeltDigit(String name, int stride) {}
+    public static class Day01Test {
+        @Test
+        void solvePart1_sample() {
+            var day = new Day01("_sample1");
+            day.parsePart1();
+            assertEquals(142L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day01("");
+            day.parsePart1();
+            assertEquals(54634L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample() {
+            var day = new Day01("_sample2");
+            day.parsePart2();
+            assertEquals(281L, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day01("");
+            day.parsePart2();
+            assertEquals(53855L, day.solvePart2());
+        }
+    }
 }
 /*
 
