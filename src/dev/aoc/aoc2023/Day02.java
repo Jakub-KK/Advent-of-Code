@@ -1,20 +1,29 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class Day02 extends Day {
-    public static void main(String[] args) {
-        new Day02("").run(); // _small
-    }
-
     public Day02(String inputSuffix) {
         super(inputSuffix);
     }
 
-    @Override
-    protected Object solvePart1() {
+    public static void main(String[] args) {
+        Day.run(() -> new Day02("_sample")); // _sample
+    }
+
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
+    }
+
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         int[] limits = {12, 13, 14}; // R, G, B - for part A of the puzzle
-        int result = stream()
+        long result = stream()
                 .mapToInt(line -> {
                     // parse game ID
                     int gidStart = line.indexOf(' '), gidEnd = line.indexOf(':');
@@ -45,9 +54,13 @@ public class Day02 extends Day {
         return result;
     }
 
-    @Override
-    protected Object solvePart2() {
-        int result = stream()
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+    }
+
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
+        long result = stream()
                 .mapToInt(line -> {
                     // parse game ID
                     int gidEnd = line.indexOf(':');
@@ -74,6 +87,36 @@ public class Day02 extends Day {
                 .sum()
                 ;
         return result;
+    }
+
+    public static class Day02Test {
+        @Test
+        void solvePart1_sample() {
+            var day = new Day02("_sample");
+            day.parsePart1();
+            assertEquals(8L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day02("");
+            day.parsePart1();
+            assertEquals(2169L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample() {
+            var day = new Day02("_sample");
+            day.parsePart2();
+            assertEquals(2286L, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day02("");
+            day.parsePart2();
+            assertEquals(60948L, day.solvePart2());
+        }
     }
 }
 /*
