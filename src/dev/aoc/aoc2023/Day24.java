@@ -175,7 +175,7 @@ public class Day24 extends Day {
 
     @SolutionSolver(partNumber = 1)
     public Object solvePart1() {
-        if (true) return null;
+        // if (true) return null;
         long areaStart = getInputSuffix().isEmpty() ? 200000000000000L : 7;
         long areaEnd = getInputSuffix().isEmpty() ? 400000000000000L : 27;
         int count = 0;
@@ -274,11 +274,6 @@ public class Day24 extends Day {
     }
 
     public static class Day24Test {
-        @Test
-        void knownGoodInputs() {
-
-        }
-
         @Test
         void solvePart1_sample() {
             var day = new Day24("_sample");

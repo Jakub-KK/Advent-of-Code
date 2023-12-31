@@ -14,12 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class Day12 extends Day {
-    public static void main(String[] args) {
-        Day.run(() -> new Day12("")); //_sample, _small2, _test_trimming
-    }
-
     public Day12(String inputSuffix) {
         super(inputSuffix);
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day12("")); //_sample, _small2, _test_trimming
     }
 
     private interface ISpringsLineParse {

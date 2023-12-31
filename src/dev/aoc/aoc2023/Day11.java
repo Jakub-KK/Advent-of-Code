@@ -16,13 +16,13 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class Day11 extends Day {
-    public static void main(String[] args) {
-        Day.run(() -> new Day11("")); //_sample, _large1, _large2, _large3
-    }
-
     public Day11(String inputSuffix) {
         super(inputSuffix);
         solverType = SolverType.FAST_1;
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day11("")); //_sample, _large1, _large2, _large3
     }
 
     protected record Map(List<String> map, int width, int height) {

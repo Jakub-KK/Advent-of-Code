@@ -18,6 +18,10 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class Day14 extends Day {
+    public Day14(String inputSuffix) {
+        super(inputSuffix);
+    }
+
     public static void main(String[] args) {
         // _longcycle_2520 (source: https://old.reddit.com/r/adventofcode/comments/18i45eo/2023_day_14_part_2_worst_case_complexity/)
         // _longcycle_5 (cycle of length 5 extracted from _longcycle_2520)
@@ -26,10 +30,6 @@ public class Day14 extends Day {
         // _longcycle_870870_2x3x5x7x11x13x29 (source: https://old.reddit.com/r/adventofcode/comments/18i45eo/2023_day_14_part_2_worst_case_complexity/kdfxrus/)
         // _longcycle_13082761331670030_43x41x37x31x29x23x19x17x13x11x7x5x3x2 (source: https://old.reddit.com/r/adventofcode/comments/18it12w/2023_day_14_part_2_custom_worst_case_testcase/)
         Day.run(() -> new Day14("")); // _sample
-    }
-
-    public Day14(String inputSuffix) {
-        super(inputSuffix);
     }
 
     private static final HashFunction hashSHA256 = Hashing.sha256();

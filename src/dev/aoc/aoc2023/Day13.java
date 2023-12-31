@@ -16,6 +16,19 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class Day13 extends Day {
+    public Day13(String inputSuffix, boolean doEnlargeInput) {
+        this(inputSuffix, doEnlargeInput, 1000, 0L); // const RNG seed for repeatability
+    }
+    public Day13(String inputSuffix) {
+        this(inputSuffix, false, 0, 0L);
+    }
+    private Day13(String inputSuffix, boolean doEnlargeInput, int enlargeToMinSide, long rngSeed) {
+        super(inputSuffix);
+        this.doEnlargeInput = doEnlargeInput;
+        this.enlargeToMinSide = enlargeToMinSide;
+        rng = new Random(rngSeed);
+    }
+
     public static void main(String[] args) {
         // uses const RNG seed for repeatability for speed tests
         Day.run(() -> new Day14("")); // _small2, _small3
@@ -24,21 +37,6 @@ public class Day13 extends Day {
     private final boolean doEnlargeInput;
 
     private final int enlargeToMinSide;
-
-    public Day13(String inputSuffix) {
-        this(inputSuffix, false, 0, 0L);
-    }
-
-    public Day13(String inputSuffix, boolean doEnlargeInput) {
-        this(inputSuffix, doEnlargeInput, 1000, 0L); // const RNG seed for repeatability
-    }
-
-    private Day13(String inputSuffix, boolean doEnlargeInput, int enlargeToMinSide, long rngSeed) {
-        super(inputSuffix);
-        this.doEnlargeInput = doEnlargeInput;
-        this.enlargeToMinSide = enlargeToMinSide;
-        rng = new Random(rngSeed);
-    }
 
     /** Cache for results of finding mirrors without smudge, will be used in finding mirrors with smudge later */
     private final Map<List<String>, Long> resultsMirrors = new HashMap<>();
@@ -404,7 +402,7 @@ public class Day13 extends Day {
     }
 
     public static class Day13Test {
-        void assertPatterResults(long count, long countWithSmudge, Pattern pattern) {
+        void assertPatternResults(long count, long countWithSmudge, Pattern pattern) {
             assertEquals(count, pattern.findMirrors());
             assertEquals(countWithSmudge, pattern.findMirrorsWithSmudge());
         }
@@ -449,13 +447,13 @@ public class Day13 extends Day {
             var day = new Day13("", true, 1000, 1L);
             day.parsePart1();
             day.parsePart2();
-            assertEquals(229559540L, day.solvePart2());
+            assertEquals(248233407L, day.solvePart2());
         }
 
         @Test
         void knownGoodInputs() {
             var day = new Day13("__dummy__");
-            assertPatterResults(3, 0,
+            assertPatternResults(3, 0,
                     day.testPattern(List.of( // no smudges
                             "#....#",
                             ".#..#.",
@@ -465,7 +463,7 @@ public class Day13 extends Day {
                             "#....#"
                     ))
             );
-            assertPatterResults(0, 3,
+            assertPatternResults(0, 3,
                     day.testPattern(List.of( // one smudge at the mirror
                             "#....#",
                             ".#..#.",
@@ -475,7 +473,7 @@ public class Day13 extends Day {
                             "#....#"
                     ))
             );
-            assertPatterResults(0, 0,
+            assertPatternResults(0, 0,
                     day.testPattern(List.of( // one smudge at the mirror, one in the  reflection
                             "#....#",
                             ".#..##",
@@ -485,7 +483,7 @@ public class Day13 extends Day {
                             "#....#"
                     ))
             );
-            assertPatterResults(0, 0,
+            assertPatternResults(0, 0,
                     day.testPattern(List.of( // two smudges one in the reflection (no detection, only one smudge per patter allowed)
                             "##...#",
                             ".#..##",

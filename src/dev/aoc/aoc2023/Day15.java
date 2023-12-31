@@ -14,12 +14,12 @@ import java.util.stream.LongStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class Day15 extends Day {
-    public static void main(String[] args) {
-        Day.run(() -> new Day15("_sample")); // _sample
-    }
-
     public Day15(String inputSuffix) {
         super(inputSuffix);
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day15("_sample")); // _sample
     }
 
     private final List<String> instructions = new ArrayList<>(); // raw instructions
@@ -153,11 +153,6 @@ public class Day15 extends Day {
     }
 
     public static class Day15Test {
-        @Test
-        void knownGoodInputs() {
-
-        }
-
         @Test
         void solvePart1_sample() {
             var day = new Day15("_sample");

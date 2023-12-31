@@ -391,11 +391,6 @@ public class Day22 extends Day {
 
     public static class Day22Test {
         @Test
-        void knownGoodInputs() {
-
-        }
-
-        @Test
         void solvePart1_small() {
             var day = new Day22("_sample");
             day.parsePart1();

@@ -1531,7 +1531,7 @@ public class Day21 extends Day {
         void knownGoodInputs() {
             var day = new Day21("_sample_empty_1x1maps");
             day.parsePart2();
-            assertEquals(1002001L, day.getPlotCountReachableInSteps(1000));
+            assertEquals(1002001L, day.getPlotCountReachableInSteps(1000).plotCountReachableInSteps);
         }
 
         @Test
