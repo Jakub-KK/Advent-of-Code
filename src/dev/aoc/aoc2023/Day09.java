@@ -4,6 +4,7 @@ import dev.aoc.common.Day;
 import dev.aoc.common.SolutionParser;
 import dev.aoc.common.SolutionSolver;
 import org.apache.commons.math3.analysis.polynomials.PolynomialFunctionLagrangeForm;
+import org.junit.jupiter.api.Test;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -15,14 +16,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.*;
 
-public class Day09 extends Day {
-    public static void main(String[] args) {
-        Day.run(() -> new Day09("")); // _sample, _large
-        // new Day09("_large").createTest(200, 200, Integer.MAX_VALUE);
-    }
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class Day09 extends Day {
     public Day09(String inputSuffix) {
         super(inputSuffix);
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day09("")); // _sample, _large
     }
 
     private List<List<Long>> inputs;
@@ -212,6 +214,36 @@ public class Day09 extends Day {
             // result[i] = result[i - 1] + diffs[i - 1];
         });
         return result;
+    }
+
+    public static class Day09Test {
+        @Test
+        void solvePart1_sample() {
+            var day = new Day09("_sample");
+            day.parsePart1();
+            assertEquals(BigInteger.valueOf(114), day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day09("");
+            day.parsePart1();
+            assertEquals(BigInteger.valueOf(1762065988), day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample() {
+            var day = new Day09("_sample");
+            day.parsePart2();
+            assertEquals(BigInteger.valueOf(2), day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day09("");
+            day.parsePart2();
+            assertEquals(BigInteger.valueOf(1066), day.solvePart2());
+        }
     }
 }
 /*
