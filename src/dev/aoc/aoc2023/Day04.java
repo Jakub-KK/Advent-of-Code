@@ -2,6 +2,9 @@ package dev.aoc.aoc2023;
 
 import com.google.common.collect.Sets;
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -11,19 +14,30 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class Day04 extends Day {
-    public static void main(String[] args) {
-        new Day04("").run(); // _small, _big_1M, _big_10M
-    }
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class Day04 extends Day {
     public Day04(String inputSuffix) {
         super(inputSuffix);
     }
 
+    public static void main(String[] args) {
+        Day.run(() -> new Day04("")); // _sample
+    }
+
     private int[] wins;
     private int maxWins;
-    @Override
-    protected Object solvePart1() {
+
+    Stream<Scratchcard> input;
+
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
+        input = inputProcess(stream());
+    }
+
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
+        long result = 0;
         wins = inputProcess(stream())
                 .map(c -> Sets.intersection(c.winning, c.having).size())
                 .mapToInt(Integer::intValue)
@@ -32,19 +46,28 @@ public class Day04 extends Day {
         // long[] points = Arrays.stream(wins).mapToLong(w -> (long)Math.pow(2, w - 1)).toArray();
         // System.out.printf("Stats: avg points %f%n", (double)Arrays.stream(points).sum() / wins.length);
         maxWins = Arrays.stream(wins).max().getAsInt();
-        return Arrays.stream(wins).mapToLong(w -> (long)Math.pow(2, w - 1)).sum();
+        result = Arrays.stream(wins).mapToLong(w -> (long)Math.pow(2, w - 1)).sum();
+        return result;
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        solvePart1();
+    }
+
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
+        return part2Long();
+        // return part2BI();
         // instead of keeping all scorecard counts in memory and calculating sum later
         // we use ring buffer to keep only maxWins scorecard counts - more is not needed
-        try {
-            return part2Long();
-        } catch (IllegalStateException e) {
-            return part2BI();
-        }
+        // try {
+        //     return part2Long();
+        // } catch (IllegalStateException e) {
+        //     return part2BI();
+        // }
     }
+
     private Object part2Long() {
         var counts = new long[maxWins];
         Arrays.fill(counts, 1);
@@ -73,6 +96,7 @@ public class Day04 extends Day {
         }
         return result;
     }
+
     private Object part2BI() {
         var counts = new BigInteger[maxWins]; // ring buffer instead of whole range
         Arrays.fill(counts, BigInteger.ONE);
@@ -150,6 +174,36 @@ public class Day04 extends Day {
             //         h++;
             //     }
             // }
+        }
+    }
+
+    public static class Day04Test {
+        @Test
+        void solvePart1_sample() {
+            var day = new Day04("_sample");
+            day.parsePart1();
+            assertEquals(13L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day04("");
+            day.parsePart1();
+            assertEquals(23441L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample() {
+            var day = new Day04("_sample");
+            day.parsePart2();
+            assertEquals(30L, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day04("");
+            day.parsePart2();
+            assertEquals(5923918L, day.solvePart2());
         }
     }
 }
