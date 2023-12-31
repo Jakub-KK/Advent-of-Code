@@ -3,6 +3,7 @@ package dev.aoc.aoc2023;
 import dev.aoc.common.Day;
 import dev.aoc.common.SolutionParser;
 import dev.aoc.common.SolutionSolver;
+import org.junit.jupiter.api.Test;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -12,13 +13,15 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class Day10 extends Day {
-    public static void main(String[] args) {
-        Day.run(() -> new Day10("_sample1")); // _sample, _sample2, _sample3a, _sample3b, _sample4, _sample5
-    }
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class Day10 extends Day {
     public Day10(String inputSuffix) {
         super(inputSuffix);
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day10("_sample1")); // _sample, _sample2, _sample3a, _sample3b, _sample4, _sample5
     }
 
     private List<String> map;
@@ -45,6 +48,8 @@ public class Day10 extends Day {
         // starting point is marked as S, convert to proper pipe symbol
         char properStartingSymbol;
         if (new PlaceIdx(startX + 1, startY).symbol == '-' && new PlaceIdx(startX, startY + 1).symbol == '|') {
+            properStartingSymbol = 'F';
+        } else if (new PlaceIdx(startX + 1, startY).symbol == 'J' && new PlaceIdx(startX, startY + 1).symbol == '|') {
             properStartingSymbol = 'F';
         } else {
             throw new RuntimeException("incomplete logic of starting point substitution");
@@ -151,6 +156,7 @@ public class Day10 extends Day {
     @SolutionParser(partNumber = 2)
     public void parsePart2() {
         parsePart1();
+        solvePart1();
         // create copy of map with only the loop visible
         IntStream.range(0, height).forEach(y -> {
             var sb = new StringBuilder(width);
@@ -161,8 +167,11 @@ public class Day10 extends Day {
             });
             mapOnlyLoop.add(sb.toString());
         });
-        // save the loop map
-        saveMap(mapOnlyLoop, "_map_only_loop");
+        boolean saveMapLoop = false;
+        if (saveMapLoop) {
+            // save the loop map
+            saveMap(mapOnlyLoop, "_map_only_loop");
+        }
     }
 
     private void saveMap(List<String> map, String outputSuffix) {
@@ -178,7 +187,7 @@ public class Day10 extends Day {
         });
     }
 
-    private Map<PlaceIdx, Boolean> placesInside = new HashMap<>();
+    private final Map<PlaceIdx, Boolean> placesInside = new HashMap<>();
 
     private boolean isPlaceInside(PlaceIdx place) {
         if (distanceFromS.containsKey(place)) {
@@ -225,6 +234,64 @@ public class Day10 extends Day {
         }
         int result = placesInside.size();
         return result;
+    }
+
+    public static class Day10Test {
+        @Test
+        void solvePart1_sample1() {
+            var day = new Day10("_sample1");
+            day.parsePart1();
+            assertEquals(4, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_sample2() {
+            var day = new Day10("_sample2");
+            day.parsePart1();
+            assertEquals(8, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day10("");
+            day.parsePart1();
+            assertEquals(7097, day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample3a() {
+            var day = new Day10("_sample3a");
+            day.parsePart2();
+            assertEquals(4, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_sample3b() {
+            var day = new Day10("_sample3b");
+            day.parsePart2();
+            assertEquals(4, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_sample4() {
+            var day = new Day10("_sample4");
+            day.parsePart2();
+            assertEquals(8, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_sample5() {
+            var day = new Day10("_sample5");
+            day.parsePart2();
+            assertEquals(10, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day10("");
+            day.parsePart2();
+            assertEquals(355, day.solvePart2());
+        }
     }
 }
 /*
