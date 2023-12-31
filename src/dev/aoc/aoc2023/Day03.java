@@ -1,28 +1,39 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
+import org.junit.jupiter.api.Test;
 
 import java.util.*;
 
-public class Day03 extends Day {
-    public static void main(String[] args) {
-        new Day03("").run(); // _small
-    }
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class Day03 extends Day {
     public Day03(String inputSuffix) {
         super(inputSuffix);
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day03("_sample")); // _sample
     }
 
     private List<String> engine;
     private int width, height;
 
-    @Override
-    protected Object solvePart1() {
+    private int makeGearId(int w, int h) { return h * width + w; }
+
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
+    }
+
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         engine = stream().toList();
         width = engine.get(0).length();
         height = engine.size();
 
-        int result = 0;
+        long result = 0;
         for (int h = 0; h < height; h++) {
             int w = 0;
             String engineLine = engine.get(h);
@@ -39,7 +50,7 @@ public class Day03 extends Day {
                 }
                 int pEnd = w;
                 int part = Integer.parseInt(engineLine.substring(pStart, pEnd));
-                // check is has symbol adjacent
+                // check if has symbol adjacent
                 boolean hasSymbol = false;
                 if (!hasSymbol && h > 0) {
                     String sline = engine.get(h - 1);
@@ -82,8 +93,13 @@ public class Day03 extends Day {
         return result;
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        solvePart1();
+    }
+
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         Map<Integer, ArrayList<Integer>> gears = new HashMap<Integer, ArrayList<Integer>>();
         for (int h = 0; h < height; h++) {
             int w = 0;
@@ -134,7 +150,7 @@ public class Day03 extends Day {
                 }
             } while (w < width);
         }
-        int result = 0;
+        long result = 0;
         for (Map.Entry<Integer, ArrayList<Integer>> gearEntry : gears.entrySet()) {
             ArrayList<Integer> parts = gearEntry.getValue();
             if (parts.size() == 2) {
@@ -144,7 +160,35 @@ public class Day03 extends Day {
         return result;
     }
 
-    private int makeGearId(int w, int h) { return h * width + w; }
+    public static class Day03Test {
+        @Test
+        void solvePart1_sample() {
+            var day = new Day03("_sample");
+            day.parsePart1();
+            assertEquals(4361L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day03("");
+            day.parsePart1();
+            assertEquals(531932L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample() {
+            var day = new Day03("_sample");
+            day.parsePart2();
+            assertEquals(467835L, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day03("");
+            day.parsePart2();
+            assertEquals(73646890L, day.solvePart2());
+        }
+    }
 }
 /*
 
