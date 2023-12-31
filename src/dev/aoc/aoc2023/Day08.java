@@ -2,6 +2,9 @@ package dev.aoc.aoc2023;
 
 import com.google.common.collect.Sets;
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
+import org.junit.jupiter.api.Test;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -9,13 +12,15 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class Day08 extends Day {
-    public static void main(String[] args) {
-        new Day08("").run(); // _small1, _small2, _small3, _small4, _small5_nodeshare, _small6_nonLCM_1, _small6_nonLCM_2
-    }
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class Day08 extends Day {
     public Day08(String inputSuffix) {
         super(inputSuffix);
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day08("_sample")); // _sample, _small2, _small3, _small4, _small5_nodeshare, _small6_nonLCM_1, _small6_nonLCM_2
     }
 
     private record Node(String l, String r) {}
@@ -24,8 +29,8 @@ public class Day08 extends Day {
     private final Map<String, Node> map = new HashMap<>();
     private final List<String> startsForPart2 = new ArrayList<>(); // part 2 starting nodes
 
-    @Override
-    protected void parsePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
         List<String> input = stream().collect(Collectors.toList());
         instructions = input.removeFirst();
         if (!input.get(0).trim().isEmpty()) throw new IllegalArgumentException("no blank line after the first one of the input");
@@ -38,8 +43,8 @@ public class Day08 extends Day {
         });
     }
 
-    @Override
-    protected Object solvePart1() {
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         PathFollower pathFollower = new PathFollower(instructions, map, "AAA", 0, s -> s.equals("ZZZ"), null);
         do {
             pathFollower.step();
@@ -47,8 +52,9 @@ public class Day08 extends Day {
         return pathFollower.stepsCount();
     }
 
-    @Override
-    protected void parsePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        parsePart1();
         map.keySet().forEach(p -> {
             if (p.endsWith("A")) { // collect starting nodes for part 2
                 startsForPart2.add(p);
@@ -62,8 +68,8 @@ public class Day08 extends Day {
         }
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         long[] stepsForEachStart = startsForPart2.stream().mapToLong(c -> {
             PathFollower pathFollower = new PathFollower(instructions, map, c, 0, s -> s.endsWith("Z"), null);
             do {
@@ -223,6 +229,43 @@ public class Day08 extends Day {
 
     private static long leastCommonMultiple(long a, long b) {
         return (a * b / greatestCommonDivisor(a, b));
+    }
+
+    public static class Day08Test {
+        @Test
+        void solvePart1_sample1() {
+            var day = new Day08("_sample1");
+            day.parsePart1();
+            assertEquals(2, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_sample2() {
+            var day = new Day08("_sample2");
+            day.parsePart1();
+            assertEquals(6, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day08("");
+            day.parsePart1();
+            assertEquals(12599, day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample3() {
+            var day = new Day08("_sample3");
+            day.parsePart2();
+            assertEquals(6L, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day08("");
+            day.parsePart2();
+            assertEquals(8245452805243L, day.solvePart2());
+        }
     }
 }
 // additional information about the problem and its generalization available below problem description
