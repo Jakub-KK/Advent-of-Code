@@ -1,6 +1,9 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
+import org.junit.jupiter.api.Test;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -8,11 +11,9 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
-public class Day07 extends Day {
-    public static void main(String[] args) {
-        new Day07("").run(); // _small, _test1, _test2
-    }
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class Day07 extends Day {
     public Day07(String inputSuffix) {
         super(inputSuffix);
         BiConsumer<String, Map<Character, Integer>> makeMap = (chars, map) -> {
@@ -22,6 +23,10 @@ public class Day07 extends Day {
         makeMap.accept(cardOrderPart1, cardOrderMapPart1);
         makeMap.accept(cardOrderPart2, cardOrderMapPart2);
         makeMap.accept(handOrder, handOrderMap);
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day07("_sample")); // _sample, _test1, _test2
     }
 
     final String cardOrderPart1 = "23456789TJQKA";
@@ -42,17 +47,25 @@ public class Day07 extends Day {
     record Hand(String hand, HandType handType) { }
     record HandBid(Hand hand, int bid) {}
 
-    @Override
-    protected Object solvePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
+    }
+
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         return solve(this::getHandTypePart1, cardOrderMapPart1);
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+    }
+
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         return solve(this::getHandTypePart2, cardOrderMapPart2);
     }
 
-    private int solve(Function<String, HandType> getHandType, Map<Character, Integer> cardOrderMap) {
+    private long solve(Function<String, HandType> getHandType, Map<Character, Integer> cardOrderMap) {
         var handBidsStream = stream()
                 .map(line -> {
                     String[] parts = line.split("\\s");
@@ -66,7 +79,7 @@ public class Day07 extends Day {
         // handBids.forEach(hb -> System.out.printf("%s %c->%c %d%n", hb.hand.hand, getHandTypePart1(hb.hand.hand), hb.hand.handType, hb.bid));
         // handBids.forEach(hb -> System.out.printf("%s %d%n", hb.hand.hand, hb.bid));
         AtomicInteger idx = new AtomicInteger(0); // for ranking of stream of hands
-        int result = handBidsStream
+        long result = handBidsStream
                 .mapToInt(hb -> idx.incrementAndGet() * hb.bid)
                 .sum()
                 ;
@@ -201,6 +214,36 @@ public class Day07 extends Day {
             default: {
                 throw new IllegalArgumentException();
             }
+        }
+    }
+
+    public static class Day07Test {
+        @Test
+        void solvePart1_sample() {
+            var day = new Day07("_sample");
+            day.parsePart1();
+            assertEquals(6440L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day07("");
+            day.parsePart1();
+            assertEquals(250951660L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample() {
+            var day = new Day07("_sample");
+            day.parsePart2();
+            assertEquals(5905L, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day07("");
+            day.parsePart2();
+            assertEquals(251481660L, day.solvePart2());
         }
     }
 }
