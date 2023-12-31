@@ -1,32 +1,37 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.LongStream;
 
-public class Day06 extends Day {
-    public static void main(String[] args) {
-        new Day06("").run(); // _small, _test1
-    }
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class Day06 extends Day {
     public Day06(String inputSuffix) {
         super(inputSuffix);
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day06("_sample")); // _sample, _test1
     }
 
     private long[] timePart1;
     private long[] distPart1;
 
-    @Override
-    protected void parsePart1() {
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
         List<String> lines = stream().toList();
         timePart1 = Arrays.stream(lines.get(0).split("\\s")).map(String::trim).filter(s -> !s.isEmpty()).skip(1).mapToLong(Long::parseLong).toArray();
         distPart1 = Arrays.stream(lines.get(1).split("\\s")).map(String::trim).filter(s -> !s.isEmpty()).skip(1).mapToLong(Long::parseLong).toArray();
     }
 
-    @Override
-    protected Object solvePart1() {
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         long result = LongStream.range(0, timePart1.length)
                 .map(i -> numberOfWaysToWinTheRace(timePart1[(int) i], distPart1[(int)i]))
                 .reduce(1, (a, b) -> a * b);
@@ -36,15 +41,15 @@ public class Day06 extends Day {
     private long timePart2;
     private long distPart2;
 
-    @Override
-    protected void parsePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
         List<String> lines = stream().toList();
         timePart2 = Long.parseLong(lines.get(0).replaceAll("\\s", "").split(":")[1]);
         distPart2 = Long.parseLong(lines.get(1).replaceAll("\\s", "").split(":")[1]);
     }
-
-    @Override
-    protected Object solvePart2() {
+    
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         long result = numberOfWaysToWinTheRace(timePart2, distPart2);
         return result;
     }
@@ -82,6 +87,36 @@ public class Day06 extends Day {
         //         .map(t -> t * (time - t))
         //         .filter(d -> d > distance)
         //         .count();
+    }
+
+    public static class Day06Test {
+        @Test
+        void solvePart1_sample() {
+            var day = new Day06("_sample");
+            day.parsePart1();
+            assertEquals(288L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day06("");
+            day.parsePart1();
+            assertEquals(449820L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample() {
+            var day = new Day06("_sample");
+            day.parsePart2();
+            assertEquals(71503L, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day06("");
+            day.parsePart2();
+            assertEquals(42250895L, day.solvePart2());
+        }
     }
 }
 /*
