@@ -1,32 +1,36 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.SolutionParser;
+import dev.aoc.common.SolutionSolver;
+import org.junit.jupiter.api.Test;
 
 import java.util.*;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-public class Day05 extends Day {
-    public static void main(String[] args) {
-        new Day05("").run(); // _small
-    }
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class Day05 extends Day {
     public Day05(String inputSuffix) {
         super(inputSuffix);
+    }
+
+    public static void main(String[] args) {
+        Day.run(() -> new Day05("_sample")); // _sample
     }
 
     private long[] seeds = null;
     private List<SeedRange> seedRanges;
     private final AlmanacRange[][] almanac = new AlmanacRange[7][];
 
-    @Override
+    @SolutionParser(partNumber = 1)
     protected void parsePart1() {
-        Stream<String> stream = Stream.concat(stream(), Arrays.stream(new String[]{""})); // add guard for easier parsing (it pushes last chapter to almanac)
-        inputParse(stream);
+        inputParse();
     }
 
-    @Override
-    protected Object solvePart1() {
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
         // map seed to location
         long[] seed2loc = Arrays.stream(seeds)
                 .map(s -> propagateValue(almanac[chapters.get("seed2soil")], s))
@@ -44,16 +48,17 @@ public class Day05 extends Day {
                 .getAsLong();
     }
 
-    @Override
-    protected void parsePart2() {
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        inputParse();
         seedRanges = new ArrayList<>(seeds.length / 2);
         for (int s = 0; s < seeds.length / 2; s++) {
             seedRanges.add(new SeedRange(seeds[2 * s], seeds[2 * s +1]));
         }
     }
 
-    @Override
-    protected Object solvePart2() {
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
         Stream<SeedRange> srStream = seedRanges.stream();
         for (int ch = 0; ch < almanac.length; ch++) {
             int _ch = ch;
@@ -67,6 +72,10 @@ public class Day05 extends Day {
 
     private ArrayList<AlmanacRange> currChapterArr;
     private int currChapter;
+    private void inputParse() {
+        Stream<String> stream = Stream.concat(stream(), Arrays.stream(new String[]{""})); // add guard for easier parsing (it pushes last chapter to almanac)
+        inputParse(stream);
+    }
     private void inputParse(Stream<String> stream) {
         seeds = null;
         currChapterArr = new ArrayList<>();
@@ -238,6 +247,36 @@ public class Day05 extends Day {
         var result = new ArrayList<SeedRange>();
         propagateRangeIterator(chapter, s).forEachRemaining(result::add);
         return result.stream();
+    }
+
+    public static class Day05Test {
+        @Test
+        void solvePart1_sample() {
+            var day = new Day05("_sample");
+            day.parsePart1();
+            assertEquals(35L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart1_main() {
+            var day = new Day05("");
+            day.parsePart1();
+            assertEquals(510109797L, day.solvePart1());
+        }
+
+        @Test
+        void solvePart2_sample() {
+            var day = new Day05("_sample");
+            day.parsePart2();
+            assertEquals(46L, day.solvePart2());
+        }
+
+        @Test
+        void solvePart2_main() {
+            var day = new Day05("");
+            day.parsePart2();
+            assertEquals(9622622L, day.solvePart2());
+        }
     }
 }
 /*
