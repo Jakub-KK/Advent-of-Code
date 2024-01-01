@@ -1,17 +1,16 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.Grid;
 import dev.aoc.common.SolutionParser;
 import dev.aoc.common.SolutionSolver;
 import org.junit.jupiter.api.Test;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -21,105 +20,33 @@ public class Day10 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day10("_sample1")); // _sample, _sample2, _sample3a, _sample3b, _sample4, _sample5
+        Day.run(() -> new Day10("_sample1")); // _sample1, _sample2, _sample3a, _sample3b, _sample4, _sample5
     }
 
-    private List<String> map;
-    private int width, height;
+    private Grid<Character> mapG;
+
     private int startX, startY;
-
-    private char getSymbol(int x, int y) {
-        return map.get(y).charAt(x);
-    }
 
     @SolutionParser(partNumber = 1)
     public void parsePart1() {
-        map = stream().collect(Collectors.toList());
-        width = map.get(0).length();
-        height = map.size();
-        IntStream.range(0, height).forEach(y -> {
-            IntStream.range(0, width).forEach(x -> {
-                if (getSymbol(x, y) == 'S') {
-                    startX = x;
-                    startY = y;
-                }
-            });
+        mapG = new Grid<>(stream().toList(), "", s -> s.charAt(0), Character.valueOf(' ').getClass());
+        mapG.forEach((p, ch) -> {
+            if (ch == 'S') {
+                startX = p.getValue0();
+                startY = p.getValue1();
+            }
         });
         // starting point is marked as S, convert to proper pipe symbol
         char properStartingSymbol;
-        if (new PlaceIdx(startX + 1, startY).symbol == '-' && new PlaceIdx(startX, startY + 1).symbol == '|') {
+        if (mapG.is(startX + 1, startY, '-') && mapG.is(startX, startY + 1, '|')) {
             properStartingSymbol = 'F';
-        } else if (new PlaceIdx(startX + 1, startY).symbol == 'J' && new PlaceIdx(startX, startY + 1).symbol == '|') {
+        } else if (mapG.is(startX + 1, startY, 'J') && mapG.is(startX, startY + 1, '|')) {
             properStartingSymbol = 'F';
         } else {
             throw new RuntimeException("incomplete logic of starting point substitution");
         }
-        String startingLine = map.get(startY);
-        map.set(startY, startingLine.substring(0, startX) + properStartingSymbol + startingLine.substring(startX + 1));
+        mapG.set(startX, startY, properStartingSymbol);
     }
-
-    private class PlaceIdx {
-        public final int x;
-        public final int y;
-        public final char symbol;
-
-        public PlaceIdx(int x, int y) {
-            this.x = x;
-            this.y = y;
-            this.symbol = (x < 0 || y < 0) ? ' ' : getSymbol(x, y);
-        }
-
-        public int getIdx() {
-            return y * width + x;
-        }
-
-        @Override
-        public int hashCode() {
-            return Integer.hashCode(getIdx());
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            PlaceIdx placeIdx = (PlaceIdx) o;
-            return x == placeIdx.x && y == placeIdx.y;
-        }
-    }
-    private final PlaceIdx PIDX_NULL = new PlaceIdx(Integer.MIN_VALUE, Integer.MIN_VALUE);
-
-    private record PipeHead(PlaceIdx head, PlaceIdx comingFrom) {}
-
-    private List<PlaceIdx> getNext(PlaceIdx place) {
-        List<PlaceIdx> result = new ArrayList<>();
-        if (place.x > 0 && (place.symbol == '-' || place.symbol == '7' || place.symbol == 'J')) {
-            char pLeft = getSymbol(place.x - 1, place.y);
-            if (pLeft == '-' || pLeft == 'L' || pLeft == 'F') {
-                result.add(new PlaceIdx(place.x - 1, place.y));
-            }
-        }
-        if (place.x < width - 1 && (place.symbol == '-' || place.symbol == 'L' || place.symbol == 'F')) {
-            char pRight = getSymbol(place.x + 1, place.y);
-            if (pRight == '-' || pRight == 'J' || pRight == '7') {
-                result.add(new PlaceIdx(place.x + 1, place.y));
-            }
-        }
-        if (place.y > 0 && (place.symbol == '|' || place.symbol == 'L' || place.symbol == 'J')) {
-            char pUp = getSymbol(place.x, place.y - 1);
-            if (pUp == '|' || pUp == '7' || pUp == 'F') {
-                result.add(new PlaceIdx(place.x, place.y - 1));
-            }
-        }
-        if (place.y < height - 1 && (place.symbol == '|' || place.symbol == 'F' || place.symbol == '7')) {
-            char pDown = getSymbol(place.x, place.y + 1);
-            if (pDown == '|' || pDown == 'J' || pDown == 'L') {
-                result.add(new PlaceIdx(place.x, place.y + 1));
-            }
-        }
-        return result;
-    }
-
-    private final Map<PlaceIdx, Integer> distanceFromS = new HashMap<>(); // place idx -> distance from S
 
     @SolutionSolver(partNumber = 1)
     public Object solvePart1() {
@@ -151,28 +78,109 @@ public class Day10 extends Day {
         return result;
     }
 
-    private final List<String> mapOnlyLoop = new ArrayList<>();
-
     @SolutionParser(partNumber = 2)
     public void parsePart2() {
         parsePart1();
         solvePart1();
-        // create copy of map with only the loop visible
-        IntStream.range(0, height).forEach(y -> {
-            var sb = new StringBuilder(width);
-            IntStream.range(0, width).forEach(x -> {
-               PlaceIdx pi = new PlaceIdx(x, y);
-               int distance = distanceFromS.getOrDefault(pi, Integer.MIN_VALUE);
-               sb.append(distance >= 0 ? pi.symbol : '.');
-            });
-            mapOnlyLoop.add(sb.toString());
-        });
         boolean saveMapLoop = false;
         if (saveMapLoop) {
+            Grid<Character> mapOnlyLoop = mapG.getTemplate('.');
+            mapOnlyLoop.map((x, y) -> {
+                PlaceIdx pi = new PlaceIdx(x, y);
+                int distance = distanceFromS.getOrDefault(pi, Integer.MIN_VALUE);
+                return distance >= 0 ? pi.symbol : '.';
+            });
             // save the loop map
-            saveMap(mapOnlyLoop, "_map_only_loop");
+            saveMap(mapOnlyLoop.toLines(), "_map_only_loop");
         }
     }
+
+    @SolutionSolver(partNumber = 2)
+    public Object solvePart2() {
+        mapG.forEach((p, ch) -> {
+            PlaceIdx pi = new PlaceIdx(p.getValue0(), p.getValue1());
+            if (isPlaceInside(pi)) {
+                placesInside.put(pi, true);
+            }
+        });
+        boolean saveMapLoopAndInside = false;
+        if (saveMapLoopAndInside) {
+            // create copy of map with only the loop and inside places visible
+            Grid<Character> mapOnlyLoopAndInside = mapG.getTemplate('.');
+            mapOnlyLoopAndInside.map((x, y) -> {
+                PlaceIdx pi = new PlaceIdx(x, y);
+                int distance = distanceFromS.getOrDefault(pi, Integer.MIN_VALUE);
+                return distance >= 0 ? pi.symbol : placesInside.containsKey(pi) ? 'I' : '.';
+            });
+            // save the loop map
+            saveMap(mapOnlyLoopAndInside.toLines(), "_map_inside");
+        }
+        int result = placesInside.size();
+        return result;
+    }
+
+    private class PlaceIdx {
+        public final int x;
+        public final int y;
+        public final char symbol;
+
+        public PlaceIdx(int x, int y) {
+            this.x = x;
+            this.y = y;
+            this.symbol = (x < 0 || y < 0) ? ' ' : mapG.get(x, y);
+        }
+
+        public int getIdx() {
+            return mapG.getUniqueId(x, y);
+        }
+
+        @Override
+        public int hashCode() {
+            return Integer.hashCode(getIdx());
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            PlaceIdx placeIdx = (PlaceIdx) o;
+            return x == placeIdx.x && y == placeIdx.y;
+        }
+    }
+    private final PlaceIdx PIDX_NULL = new PlaceIdx(Integer.MIN_VALUE, Integer.MIN_VALUE);
+
+    private record PipeHead(PlaceIdx head, PlaceIdx comingFrom) {}
+
+    private List<PlaceIdx> getNext(PlaceIdx place) {
+        List<PlaceIdx> result = new ArrayList<>();
+        if (place.x > 0 && (place.symbol == '-' || place.symbol == '7' || place.symbol == 'J')) {
+            char pLeft = mapG.get(place.x - 1, place.y);
+            if (pLeft == '-' || pLeft == 'L' || pLeft == 'F') {
+                result.add(new PlaceIdx(place.x - 1, place.y));
+            }
+        }
+        if (place.x < mapG.getWidth() - 1 && (place.symbol == '-' || place.symbol == 'L' || place.symbol == 'F')) {
+            char pRight = mapG.get(place.x + 1, place.y);
+            if (pRight == '-' || pRight == 'J' || pRight == '7') {
+                result.add(new PlaceIdx(place.x + 1, place.y));
+            }
+        }
+        if (place.y > 0 && (place.symbol == '|' || place.symbol == 'L' || place.symbol == 'J')) {
+            char pUp = mapG.get(place.x, place.y - 1);
+            if (pUp == '|' || pUp == '7' || pUp == 'F') {
+                result.add(new PlaceIdx(place.x, place.y - 1));
+            }
+        }
+        if (place.y < mapG.getHeight() - 1 && (place.symbol == '|' || place.symbol == 'F' || place.symbol == '7')) {
+            char pDown = mapG.get(place.x, place.y + 1);
+            if (pDown == '|' || pDown == 'J' || pDown == 'L') {
+                result.add(new PlaceIdx(place.x, place.y + 1));
+            }
+        }
+        return result;
+    }
+
+    private final Map<PlaceIdx, Integer> distanceFromS = new HashMap<>(); // place idx -> distance from S
 
     private void saveMap(List<String> map, String outputSuffix) {
         createTestFile(getInputSuffix() + outputSuffix, writer -> {
@@ -205,35 +213,6 @@ public class Day10 extends Day {
             }
         }
         return (edges & 1) == 1; // place is inside if number of edge crossings is odd
-    }
-
-    @SolutionSolver(partNumber = 2)
-    public Object solvePart2() {
-        IntStream.range(0, height).forEach(y -> {
-            IntStream.range(0, width).forEach(x -> {
-                PlaceIdx pi = new PlaceIdx(x, y);
-                if (isPlaceInside(pi)) {
-                    placesInside.put(pi, true);
-                }
-            });
-        });
-        boolean saveMapLoopAndInside = false;
-        if (saveMapLoopAndInside) {
-            // create copy of map with only the loop and inside places visible
-            List<String> mapLoopAndInside = new ArrayList<>();
-            IntStream.range(0, height).forEach(y -> {
-                var sb = new StringBuilder(width);
-                IntStream.range(0, width).forEach(x -> {
-                    PlaceIdx pi = new PlaceIdx(x, y);
-                    int distance = distanceFromS.getOrDefault(pi, Integer.MIN_VALUE);
-                    sb.append(distance >= 0 ? pi.symbol : placesInside.containsKey(pi) ? 'I' : '.');
-                });
-                mapLoopAndInside.add(sb.toString());
-            });
-            saveMap(mapLoopAndInside, "_map_inside");
-        }
-        int result = placesInside.size();
-        return result;
     }
 
     public static class Day10Test {
