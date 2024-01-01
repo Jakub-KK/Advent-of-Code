@@ -22,7 +22,7 @@ public class Day04 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day04("")); // _sample
+        Day.run(() -> new Day04("_sample")); // _sample
     }
 
     private int[] wins;
@@ -32,13 +32,13 @@ public class Day04 extends Day {
 
     @SolutionParser(partNumber = 1)
     public void parsePart1() {
-        input = inputProcess(stream());
+        input = stream().map(Scratchcard::parse);
     }
 
     @SolutionSolver(partNumber = 1)
     public Object solvePart1() {
         long result = 0;
-        wins = inputProcess(stream())
+        wins = input
                 .map(c -> Sets.intersection(c.winning, c.having).size())
                 .mapToInt(Integer::intValue)
                 .toArray();
@@ -52,25 +52,29 @@ public class Day04 extends Day {
 
     @SolutionParser(partNumber = 2)
     public void parsePart2() {
+        parsePart1();
         solvePart1();
     }
 
     @SolutionSolver(partNumber = 2)
     public Object solvePart2() {
-        return part2Long();
+        // return part2Long();
         // return part2BI();
-        // instead of keeping all scorecard counts in memory and calculating sum later
-        // we use ring buffer to keep only maxWins scorecard counts - more is not needed
-        // try {
-        //     return part2Long();
-        // } catch (IllegalStateException e) {
-        //     return part2BI();
-        // }
+        try {
+            return part2Long();
+        } catch (IllegalStateException e) {
+            return part2BI();
+        }
     }
 
+    // instead of keeping all scorecard counts in memory and calculating sum later
+    // we use ring buffer to keep only maxWins+1 scorecard counts - more is not needed
     private Object part2Long() {
-        var counts = new long[maxWins];
+        // var counts2 = new long[wins.length];
+        // Arrays.fill(counts2, 1);
+        var counts = new long[maxWins + 1];
         Arrays.fill(counts, 1);
+        long result2 = 0;
         long result = 0;
         for (int w = 0; w < wins.length; w++) {
             int winCnt = wins[w];
@@ -80,6 +84,7 @@ public class Day04 extends Day {
                     System.out.printf("card %d out of bounds%n", w);
                     continue;
                 }
+                // counts2[w + 1 + wc] += counts2[w];
                 int cic = (w + 1 + wc) % counts.length;
                 counts[cic] += counts[ci];
                 if (counts[cic] < 0) {
@@ -87,6 +92,7 @@ public class Day04 extends Day {
                     return result;
                 }
             }
+            // result2 += counts2[w];
             result += counts[ci];
             counts[ci] = 1;
             if (result < 0) {
@@ -98,7 +104,7 @@ public class Day04 extends Day {
     }
 
     private Object part2BI() {
-        var counts = new BigInteger[maxWins]; // ring buffer instead of whole range
+        var counts = new BigInteger[maxWins + 1]; // ring buffer instead of whole range
         Arrays.fill(counts, BigInteger.ONE);
         BigInteger result = BigInteger.ZERO;
         for (int w = 0; w < wins.length; w++) {
@@ -120,21 +126,18 @@ public class Day04 extends Day {
         return result;
     }
 
-    record Scratchcard(Set<String> winning, Set<String> having) {}
-
-    private Stream<Scratchcard> inputProcess(Stream<String> stream) {
-        return stream.map(line -> {
+    private record Scratchcard(Set<String> winning, Set<String> having) {
+        public static Scratchcard parse(String line) {
             int posWinStart = line.indexOf(": ") + 2;
             int posWinEnd = line.indexOf(" | ");
             var winningSet = Arrays.stream(line.substring(posWinStart, posWinEnd).split("\\s+")).collect(Collectors.toSet());
             var havingSet = Arrays.stream(line.substring(posWinEnd + 3).split("\\s+")).collect(Collectors.toSet());
             return new Scratchcard(winningSet, havingSet);
-        });
+        }
     }
 
-    private final List<Scratchcard> cards = new ArrayList<>();
-
-    private void inputParse(List<String> lines) {
+    private List<Scratchcard> inputParse(List<String> lines) {
+        List<Scratchcard> cards = new ArrayList<>();
         for (var line : lines) {
             int posWinStart = line.indexOf(": ") + 2;
             int posWinEnd = line.indexOf(" | ");
@@ -175,6 +178,7 @@ public class Day04 extends Day {
             //     }
             // }
         }
+        return cards;
     }
 
     public static class Day04Test {
