@@ -1,6 +1,7 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.Day;
+import dev.aoc.common.Grid;
 import dev.aoc.common.SolutionParser;
 import dev.aoc.common.SolutionSolver;
 import org.junit.jupiter.api.Test;
@@ -10,7 +11,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,26 +22,17 @@ public class Day11 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day11("")); //_sample, _large1, _large2, _large3
+        Day.run(() -> new Day11("_sample")); // _sample, _large1, _large2, _large3
     }
 
-    protected record Map(List<String> map, int width, int height) {
-        public char getSymbol(int x, int y) {
-            return map.get(y).charAt(x);
-        }
-    }
+    private Grid<Character> map;
 
-    protected Map map;
-
-    protected final SolverType solverType;
+    private final SolverType solverType;
 
     @SolutionParser(partNumber = 1)
     public void parsePart1() {
         // read map
-        var mapStrings = stream().collect(Collectors.toList());
-        int width = mapStrings.get(0).length();
-        int height = mapStrings.size();
-        map = new Map(mapStrings, width, height);
+        map = new Grid<>(stream().toList(), "", c -> c.charAt(0), Character.valueOf(' ').getClass());
     }
 
     @SolutionSolver(partNumber = 1)
@@ -65,7 +56,7 @@ public class Day11 extends Day {
         return result;
     }
 
-    protected enum SolverType {
+    private enum SolverType {
         NAIVE {
             @Override
             public ISolver getSolver() {
@@ -88,35 +79,34 @@ public class Day11 extends Day {
         public abstract ISolver getSolver();
     }
 
-    protected interface ISolver {
-        long solve(Map map, long expansionFactor);
+    private interface ISolver {
+        long solve(Grid<Character> map, long expansionFactor);
     }
 
-    protected static class SolverFast1 implements ISolver {
-        public long solve(Map map, long expansionFactor) {
+    private static class SolverFast1 implements ISolver {
+        public long solve(Grid<Character> map, long expansionFactor) {
             // analyze map
-            int[] projectionX = new int[map.width], boundsX = new int[]{Integer.MAX_VALUE, 0};
-            int[] projectionY = new int[map.height], boundsY = new int[]{Integer.MAX_VALUE, 0};
+            int[] projectionX = new int[map.getWidth()], boundsX = new int[] { Integer.MAX_VALUE, 0 };
+            int[] projectionY = new int[map.getHeight()], boundsY = new int[] { Integer.MAX_VALUE, 0 };
             AtomicInteger count = new AtomicInteger(0);
-            IntStream.range(0, map.height).forEach(y -> {
-                String mapLine = map.map.get(y);
-                IntStream.range(0, map.width).forEach(x -> {
-                    char symbol = mapLine.charAt(x);
-                    if (symbol == '#') {
-                        count.incrementAndGet();
-                        projectionX[x]++;
-                        projectionY[y]++;
-                        if (boundsX[1] < x) {
-                            boundsX[1] = x;
-                        } else if (boundsX[0] > x) {
-                            boundsX[0] = x;
-                        }
+            map.forEach((p, ch) -> {
+                int x = p.getValue0(), y = p.getValue1();
+                if (ch == '#') {
+                    count.incrementAndGet();
+                    projectionX[x]++;
+                    projectionY[y]++;
+                    if (boundsX[1] < x) {
+                        boundsX[1] = x;
+                    } else if (boundsX[0] > x) {
+                        boundsX[0] = x;
                     }
-                });
-                if (projectionY[y] > 0) {
-                    boundsY[1] = y;
-                    if (boundsY[0] > y) {
-                        boundsY[0] = y;
+                }
+                if (x == map.getWidth() - 1) {
+                    if (projectionY[y] > 0) {
+                        boundsY[1] = y;
+                        if (boundsY[0] > y) {
+                            boundsY[0] = y;
+                        }
                     }
                 }
             });
@@ -146,8 +136,8 @@ public class Day11 extends Day {
         }
     }
 
-    protected static class SolverOptimized implements ISolver {
-        public long solve(Map map, long expansionFactor) {
+    private static class SolverOptimized implements ISolver {
+        public long solve(Grid<Character> map, long expansionFactor) {
             var mapAnalysis = analyzeMap(map);
             var axisDistances = calculateAxisDistances(expansionFactor, mapAnalysis);
             long result = calculateSumOfExpandedDistances(mapAnalysis.galaxies, axisDistances);
@@ -178,21 +168,18 @@ public class Day11 extends Day {
                     ;
         }
 
-        protected MapAnalysis analyzeMap(Map map) {
-            boolean[] emptyCols = new boolean[map.width];
+        protected MapAnalysis analyzeMap(Grid<Character> map) {
+            boolean[] emptyCols = new boolean[map.getWidth()];
             Arrays.fill(emptyCols, true);
-            boolean[] emptyRows = new boolean[map.height];
+            boolean[] emptyRows = new boolean[map.getHeight()];
             Arrays.fill(emptyRows, true);
             var galaxies = new ArrayList<Galaxy>();
-            IntStream.range(0, map.height).forEach(y -> {
-                String mapLine = map.map.get(y);
-                IntStream.range(0, map.width).forEach(x -> {
-                    char symbol = mapLine.charAt(x);
-                    if (symbol == '#') {
-                        emptyRows[y] = emptyCols[x] = false;
-                        galaxies.add(new Galaxy(x, y));
-                    }
-                });
+            map.forEach((p, ch) -> {
+                if (ch == '#') {
+                    int x = p.getValue0(), y = p.getValue1();
+                    emptyRows[y] = emptyCols[x] = false;
+                    galaxies.add(new Galaxy(x, y));
+                }
             });
             return new MapAnalysis(emptyRows, emptyCols, galaxies);
         }
@@ -204,9 +191,7 @@ public class Day11 extends Day {
             );
         }
 
-        /**
-         * Returns array for calculating distances between axis points, takes expansion into account.
-         */
+        /** Returns array for calculating distances between axis points, takes expansion into account. */
         protected long[] calculateAxisDistances(long expansionFactor, boolean[] empty) {
             long[] distancesAccumulated = IntStream.range(0, empty.length)
                     .mapToLong(i -> empty[i] ? expansionFactor : 1)
@@ -225,43 +210,49 @@ public class Day11 extends Day {
     }
 
     /** Slow implementation, wastes a lot of time traversing the map looking for galaxies and repeating expansion calculations, O(n^5) complexity where n is map side */
-    protected static class SolverNaive implements ISolver {
-        public long solve(Map map, long expansionFactor) {
-            List<Boolean> emptyRows = IntStream.range(0, map.height).mapToObj(y -> map.map.get(y).replace('.', ' ').trim().isEmpty()).toList();
-            List<Boolean> emptyCols = IntStream.range(0, map.width).mapToObj(x -> IntStream.range(0, map.height).mapToObj(y -> map.getSymbol(x, y) == '.').allMatch(b -> b)).toList();
+    private static class SolverNaive implements ISolver {
+        public long solve(Grid<Character> map, long expansionFactor) {
+            int[] emptyCols = new int[map.getWidth()];
+            Arrays.fill(emptyCols, 1);
+            int[] emptyRows = new int[map.getHeight()];
+            Arrays.fill(emptyRows, 1);
+            map.forEach((p, ch) -> {
+                if (ch == '#') {
+                    int x = p.getValue0(), y = p.getValue1();
+                    emptyRows[y] = emptyCols[x] = 0;
+                }
+            });
             AtomicLong sumDistances = new AtomicLong(0);
             AtomicInteger pairs = new AtomicInteger(0);
-            IntStream.range(0, map.height).forEach(y1 -> {
-                IntStream.range(0, map.width).forEach(x1 -> {
-                    if (map.getSymbol(x1, y1) == '#') {
-                        IntStream.range(y1, map.height).forEach(y2 -> {
-                            IntStream.range(y2 == y1 ? x1 + 1 : 0, map.width).forEach(x2 -> {
-                                if (map.getSymbol(x2, y2) == '#') {
-                                    long distance = Math.abs(x2 - x1) + Math.abs(y2 - y1);
-                                    long expansionWidth = (expansionFactor - 1) * emptyCols.stream().skip(Math.min(x1 + 1, x2 + 1)).limit(Math.max(0, Math.abs(x2 - x1) - 1)).filter(b -> b).count();
-                                    long expansionHeight = (expansionFactor - 1) * emptyRows.stream().skip(Math.min(y1 + 1, y2 + 1)).limit(Math.max(0, Math.abs(y2 - y1) - 1)).filter(b -> b).count();
-                                    long expandedDistance = distance + expansionWidth + expansionHeight;
-                                    // System.out.printf("%02d: (%d,%d) - (%d,%d) = %d (%d, %d)%n", pairs.get(), x1, y1, x2, y2, expandedDistance, expansionWidth, expansionHeight);
-                                    pairs.incrementAndGet();
-                                    sumDistances.addAndGet(expandedDistance);
-                                }
-                            });
+            map.forEach((p1, ch) -> {
+                int x1 = p1.getValue0(), y1 = p1.getValue1();
+                if (map.get(x1, y1) == '#') {
+                    IntStream.range(y1, map.getHeight()).forEach(y2 -> {
+                        IntStream.range(y2 == y1 ? x1 + 1 : 0, map.getWidth()).forEach(x2 -> {
+                            if (map.get(x2, y2) == '#') {
+                                long distance = Math.abs(x2 - x1) + Math.abs(y2 - y1);
+                                long expansionWidth = (expansionFactor - 1) * Arrays.stream(emptyCols).skip(Math.min(x1 + 1, x2 + 1)).limit(Math.max(0, Math.abs(x2 - x1) - 1)).filter(b -> b != 0).count();
+                                long expansionHeight = (expansionFactor - 1) * Arrays.stream(emptyRows).skip(Math.min(y1 + 1, y2 + 1)).limit(Math.max(0, Math.abs(y2 - y1) - 1)).filter(b -> b != 0).count();
+                                long expandedDistance = distance + expansionWidth + expansionHeight;
+                                // System.out.printf("%02d: (%d,%d) - (%d,%d) = %d (%d, %d)%n", pairs.get(), x1, y1, x2, y2, expandedDistance, expansionWidth, expansionHeight);
+                                pairs.incrementAndGet();
+                                sumDistances.addAndGet(expandedDistance);
+                            }
                         });
-                    }
-                });
+                    });
+                }
             });
             long result = sumDistances.get();
             return result;
         }
     }
 
-
     public static class Day11Test {
         SolverType[] solvers = new SolverType[] { SolverType.NAIVE, SolverType.OPTIMIZED, SolverType.FAST_1 };
 
         @Test
-        void solvePart1_small() {
-            var day = new Day11("_small");
+        void solvePart1_sample() {
+            var day = new Day11("_sample");
             day.parsePart1();
             for (SolverType type : solvers) {
                 assertEquals(374L, type.getSolver().solve(day.map, 2));
@@ -278,8 +269,8 @@ public class Day11 extends Day {
         }
 
         @Test
-        void solvePart2_small() {
-            var day = new Day11("_small");
+        void solvePart2_sample() {
+            var day = new Day11("_sample");
             day.parsePart1();
             // day11.solvePart2(); // not needed in Day11
             day.parsePart2();
