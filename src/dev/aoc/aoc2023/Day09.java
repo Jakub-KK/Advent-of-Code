@@ -6,15 +6,14 @@ import dev.aoc.common.SolutionSolver;
 import org.apache.commons.math3.analysis.polynomials.PolynomialFunctionLagrangeForm;
 import org.junit.jupiter.api.Test;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.*;
+import java.util.stream.Collectors;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -24,7 +23,7 @@ public class Day09 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day09("")); // _sample, _large
+        Day.run(() -> new Day09("_sample")); // _sample, _large
     }
 
     private List<List<Long>> inputs;
