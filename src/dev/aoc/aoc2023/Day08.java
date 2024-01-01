@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -20,7 +21,7 @@ public class Day08 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day08("_sample")); // _sample, _small2, _small3, _small4, _small5_nodeshare, _small6_nonLCM_1, _small6_nonLCM_2
+        Day.run(() -> new Day08("_sample4")); // _sample1, _sample2, _sample3, _sample4, _sample5_nodeshare, _sample6_nonLCM_1, _sample6_nonLCM_2
     }
 
     private record Node(String l, String r) {}
@@ -60,11 +61,14 @@ public class Day08 extends Day {
                 startsForPart2.add(p);
             }
         });
-        // analyze if LCM method works (for every start, every cycle has to be the same length)
-        boolean analyze = true;
-        if (analyze) {
-            if (!checkIfCanUseLeastCommonMultiplierMethod()) throw new IllegalArgumentException("at least one start leads to cycles of differing length, cannot use least common multiplier method to solve");
-            detectNodeSharing();
+        if (startsForPart2.size() > 1) {
+            // analyze if LCM method works (for every start, every cycle has to be the same length)
+            boolean analyze = true;
+            if (analyze) {
+                if (!checkIfCanUseLeastCommonMultiplierMethod())
+                    throw new IllegalArgumentException("at least one start leads to cycles of differing length, cannot use least common multiplier method to solve");
+                detectNodeSharing();
+            }
         }
     }
 
@@ -78,6 +82,17 @@ public class Day08 extends Day {
             return pathFollower.stepsCount();
         }).toArray();
         long stepsLCM = Arrays.stream(stepsForEachStart).reduce(Day08::leastCommonMultiple).getAsLong();
+        final boolean checkResult = false;
+        if (checkResult) {
+            Stream<PathFollower> paths = startsForPart2.stream().map(c -> new PathFollower(instructions, map, c, 0, s -> s.endsWith("Z"), null));
+            for (long s = 0; s < stepsLCM; s++) {
+                paths = paths.peek(PathFollower::step);
+            }
+            boolean allEnded = paths.noneMatch(PathFollower::notEnded);
+            if (!allEnded) {
+                throw new IllegalStateException("result %d is invalid, some paths ended in non-terminal states".formatted(stepsLCM));
+            }
+        }
         return stepsLCM;
     }
 
@@ -95,7 +110,7 @@ public class Day08 extends Day {
                 pathFollower.step();
             } while (pathFollower.notEnded());
             int cycle1Length = pathFollower.stepsCount();
-            System.out.printf("    cycle 1: from %d:%s to %d:%s steps %d (%d x %d)%n", 0, visited.get(0), cycle1Length, visited.get(cycle1Length), cycle1Length, cycle1Length / instructions.length(), instructions.length());
+            System.out.printf("    cycle 1: from %d:%s to %d:%s steps %d (%d x %d + %d)%n", 0, visited.get(0), cycle1Length, visited.get(cycle1Length), cycle1Length, cycle1Length / instructions.length(), instructions.length(), cycle1Length % instructions.length());
             // System.out.printf("      visited: %s%n", visited);
             // System.out.printf("      unique visited: %s%n", Set.copyOf(visited));
             // if (cycle1Length == 12599) {
@@ -115,7 +130,7 @@ public class Day08 extends Day {
             } while (pathFollower.notEnded());
             int steps = pathFollower.stepsCount();
             int cycle2Length = steps - cycle1Length;
-            System.out.printf("    cycle 2: from %d:%s to %d:%s steps %d (%d x %d)%n", cycle1Length, visited.get(cycle1Length), steps, visited.get(steps), cycle2Length, cycle2Length / instructions.length(), instructions.length());
+            System.out.printf("    cycle 2: from %d:%s to %d:%s steps %d (%d x %d + %d)%n", cycle1Length, visited.get(cycle1Length), steps, visited.get(steps), cycle2Length, cycle2Length / instructions.length(), instructions.length(), cycle2Length % instructions.length());
             // System.out.printf("      visited: %s%n", visited.stream().skip(cycle1Length).toList());
             // analysis
             boolean areCyclesTheSameLength = cycle1Length == cycle2Length;
@@ -127,9 +142,9 @@ public class Day08 extends Day {
             }
             boolean areCyclesExactlyTheSame = cycle1Length % instructions.length() == 0;
             if (!areCyclesExactlyTheSame) {
-                System.out.printf("    (POSSIBLE) DIFFERENT CYCLES: position in instructions after first cycle is %d", cycle1Length % instructions.length());
+                System.out.printf("    (POSSIBLE) DIFFERENT CYCLES: position in instructions after first cycle is %d%n", cycle1Length % instructions.length());
             }
-            return areCyclesTheSameLength && areCyclesExactlyTheSame; // can use LCM method for this start
+            return areCyclesTheSameLength/* && areCyclesExactlyTheSame*/; // can use LCM method for this start
         });
     }
 
