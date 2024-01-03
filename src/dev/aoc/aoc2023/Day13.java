@@ -83,6 +83,7 @@ public class Day13 extends Day {
             height++;
         }
 
+        // another option: convert to numbers (treat stones as bits) and compare numbers instead of strings
         public long findMirrors() {
             long result;
             result = resultsMirrors.getOrDefault(lines, -1L);
@@ -135,6 +136,9 @@ public class Day13 extends Day {
             return distance;
         }
 
+        // another option: convert to numbers (treat stones as bits) and compare numbers instead of strings
+        // for smudge detection use XOR and if result is power of two than we've got 1 smudge
+        // use x ? 1 + !!(x & (x-1)) : 0 to count set bits
         public long findMirrorsWithSmudge() {
             long mirrorResultWithoutSmudge = findMirrors(); // 0 if not found
             AtomicInteger mirrorCount = new AtomicInteger(0);
