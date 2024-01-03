@@ -34,7 +34,7 @@ public class Day14 extends Day {
 
     private static final HashFunction hashSHA256 = Hashing.sha256();
 
-    private static final class StoneMap { // TODO extends Grid
+    private static final class StoneMap {
         private final char[][] symbols;
         private final int width;
         private final int height;
