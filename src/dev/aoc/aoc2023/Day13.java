@@ -31,7 +31,7 @@ public class Day13 extends Day {
 
     public static void main(String[] args) {
         // uses const RNG seed for repeatability for speed tests
-        Day.run(() -> new Day14("")); // _small2, _small3
+        Day.run(() -> new Day14("_sample")); // _sample, _small2, _small3
     }
 
     private final boolean doEnlargeInput;

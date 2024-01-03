@@ -29,7 +29,7 @@ public class Day14 extends Day {
         // _longcycle_85085_5x7x11x13x17_filled (_longcycle_85085_5x7x11x13x17 filled with square stones '#' to speed up processing)
         // _longcycle_870870_2x3x5x7x11x13x29 (source: https://old.reddit.com/r/adventofcode/comments/18i45eo/2023_day_14_part_2_worst_case_complexity/kdfxrus/)
         // _longcycle_13082761331670030_43x41x37x31x29x23x19x17x13x11x7x5x3x2 (source: https://old.reddit.com/r/adventofcode/comments/18it12w/2023_day_14_part_2_custom_worst_case_testcase/)
-        Day.run(() -> new Day14("")); // _sample
+        Day.run(() -> new Day14("_sample")); // _sample
     }
 
     private static final HashFunction hashSHA256 = Hashing.sha256();
