@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.ToLongFunction;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,12 +57,26 @@ public class Day12 extends Day {
         ;
     }
 
-    @SolutionSolver(partNumber = 2)
-    public Object solvePart2() {
+    @SolutionSolver(partNumber = 2, solutionName = "JKK prunning")
+    public Object solvePart2_JKKPrunning() {
+        ToLongFunction<ISpringsLineParse> countArrangements = s -> countArrangements(SolverType.JKK_PRUNNING, s);
+        return solvePart2(countArrangements);
+    }
+    @SolutionSolver(partNumber = 2, solutionName = "BOOJUM straight")
+    public Object solvePart2_BOOJUMStraight() {
+        ToLongFunction<ISpringsLineParse> countArrangements = s -> countArrangements(SolverType.BOOJUM_STRAIGHT, s);
+        return solvePart2(countArrangements);
+    }
+    @SolutionSolver(partNumber = 2, solutionName = "ENCSE clean")
+    public Object solvePart2_ENCSEClean() {
+        ToLongFunction<ISpringsLineParse> countArrangements = s -> countArrangements(SolverType.ENCSE_CLEAN, s);
+        return solvePart2(countArrangements);
+    }
+    private long solvePart2(ToLongFunction<ISpringsLineParse> countArrangements) {
         long result = springsLineParse2.stream()
                 // .parallel()
                 // .peek(slp -> System.out.println(slp.toStringLong()))
-                .mapToLong(Day12::countArrangements)
+                .mapToLong(countArrangements)
                 // .peek(System.out::println)
                 .sum()
                 ;
@@ -457,14 +472,14 @@ public class Day12 extends Day {
         void solvePart2_sample() {
             var day = new Day12("_sample");
             day.parsePart2();
-            assertEquals(525152L, day.solvePart2());
+            assertEquals(525152L, day.solvePart2_JKKPrunning());
         }
 
         @Test
         void solvePart2_main() {
             var day = new Day12("");
             day.parsePart2();
-            assertEquals(4443895258186L, day.solvePart2());
+            assertEquals(4443895258186L, day.solvePart2_JKKPrunning());
         }
 
         @Test
