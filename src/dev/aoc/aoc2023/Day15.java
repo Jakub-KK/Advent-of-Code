@@ -8,6 +8,10 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.IntConsumer;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
@@ -20,6 +24,131 @@ public class Day15 extends Day {
 
     public static void main(String[] args) {
         Day.run(() -> new Day15("_sample")); // _sample
+    }
+
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
+        String line = stream().toList().getFirst();
+        instructions.addAll(Arrays.asList(line.split(",")));
+    }
+
+    @SolutionSolver(partNumber = 1)
+    public Object solvePart1() {
+        long result = instructions.stream().mapToLong(Day15::hash).sum();
+        return result;
+    }
+
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        parsePart1();
+        instructionLenses.addAll(instructions.stream().map(Lens::parse).toList());
+    }
+
+    @SolutionSolver(partNumber = 2, solutionName = "LinkedHashMap")
+    public Object solvePart2_LHM() {
+        return SolverType.LHM.getSolver().solve(instructionLenses);
+    }
+    @SolutionSolver(partNumber = 2, solutionName = "ArrayList")
+    public Object solvePart2_AL() {
+        return SolverType.AL.getSolver().solve(instructionLenses);
+    }
+
+    private enum SolverType {
+        LHM { @Override public ISolver getSolver() { return new SolverLHM(); } },
+        AL { @Override public ISolver getSolver() { return new SolverAL(); } };
+
+        public abstract ISolver getSolver();
+    }
+    private interface ISolver {
+        long solve(List<Lens> instructionLenses);
+    }
+    private static abstract class Solver implements ISolver {
+        public long solve(
+                List<Lens> instructionLenses,
+                IntConsumer boxesInit,
+                Consumer<Lens> instructionExecutor,
+                Supplier<Integer> boxesSizeSupplier,
+                Function<Long, Long> focusingPowerCalculator
+        ) {
+            IntStream.range(0, 256).forEach(boxesInit);
+            instructionLenses.forEach(instructionExecutor);
+            long result = LongStream.range(0, boxesSizeSupplier.get())
+                    .map(bi -> (bi + 1) * focusingPowerCalculator.apply(bi))
+                    .sum()
+                    ;
+            return result;
+        }
+    }
+    private static class SolverLHM extends Solver {
+        @Override
+        public long solve(List<Lens> instructionLenses) {
+            return solve(
+                    instructionLenses,
+                    i -> boxes.add(new LinkedHashMap<>()),
+                    this::executeInstruction,
+                    boxes::size,
+                    bi -> focusingPower(boxes.get((int)bi.longValue()))
+            );
+        }
+        private final List<Map<String, Lens>> boxes = new ArrayList<>(256); // uses LinkedHashMap to maintain order of lenses in the box
+        private void executeInstruction(Lens instLens) {
+            int boxNumber = hash(instLens.label);
+            var boxLenses = boxes.get(boxNumber);
+            if (instLens.focalLength == Lens.FOCAL_LENGTH_REMOVE_LENS) {
+                boxLenses.remove(instLens.label);
+            } else {
+                boxLenses.merge(instLens.label, instLens, (lOld, lNew) -> lNew);
+            }
+        }
+        private long focusingPower(Map<String, Lens> box) {
+            return Streams.zip(
+                            IntStream.iterate(1, i -> i + 1).boxed(),
+                            box.values().stream(),
+                            (i, lens) -> i * lens.focalLength
+                    )
+                    .mapToLong(l -> l)
+                    .sum()
+                    ;
+        }
+
+    }
+    private static class SolverAL extends Solver {
+        @Override
+        public long solve(List<Lens> instructionLenses) {
+            return solve(
+                    instructionLenses,
+                    i -> boxes.add(new ArrayList<>()),
+                    this::executeInstruction,
+                    boxes::size,
+                    bi -> focusingPower(boxes.get((int)bi.longValue()))
+            );
+        }
+        private final List<List<Lens>> boxes = new ArrayList<>(256); // manual box lenses list implementation
+        private void executeInstruction(Lens instLens) {
+            int boxNumber = hash(instLens.label);
+            var boxLenses = boxes.get(boxNumber);
+            boolean done = false;
+            for (int i = 0; i < boxLenses.size(); i++) {
+                if (boxLenses.get(i).label.equals(instLens.label)) {
+                    if (instLens.focalLength == Lens.FOCAL_LENGTH_REMOVE_LENS) {
+                        boxLenses.remove(i);
+                    } else {
+                        boxLenses.set(i, instLens);
+                    }
+                    done = true; // mark lens as added/removed
+                    break; // label is unique per box
+                }
+            }
+            if (!done && instLens.focalLength != Lens.FOCAL_LENGTH_REMOVE_LENS) {
+                boxLenses.add(instLens);
+            }
+        }
+        private long focusingPower(List<Lens> box) {
+            return LongStream.range(0, box.size())
+                    .map(li -> (li + 1) * box.get((int)li).focalLength)
+                    .sum()
+                    ;
+        }
     }
 
     private final List<String> instructions = new ArrayList<>(); // raw instructions
@@ -45,10 +174,6 @@ public class Day15 extends Day {
 
     private final List<Lens> instructionLenses = new ArrayList<>(); // instructions parsed into pairs label, focalLength (0 if to be removed, 1-9 otherwise)
 
-    private final List<List<Lens>> boxes_AL = new ArrayList<>(256); // manual box lenses list implementation
-
-    private final List<Map<String, Lens>> boxes_LHM = new ArrayList<>(256); // uses LinkedHashMap to maintain order of lenses in the box
-
     private static int hash(String inst) {
         int currentHash = 0;
         for (byte b : inst.getBytes(StandardCharsets.US_ASCII)) {
@@ -57,99 +182,6 @@ public class Day15 extends Day {
             currentHash %= 256;
         }
         return currentHash;
-    }
-
-    private void executeInstruction_AL(Lens instLens) {
-        int boxNumber = hash(instLens.label);
-        var boxLenses = boxes_AL.get(boxNumber);
-        boolean done = false;
-        for (int i = 0; i < boxLenses.size(); i++) {
-            if (boxLenses.get(i).label.equals(instLens.label)) {
-                if (instLens.focalLength == Lens.FOCAL_LENGTH_REMOVE_LENS) {
-                    boxLenses.remove(i);
-                } else {
-                    boxLenses.set(i, instLens);
-                }
-                done = true; // mark lens as added/removed
-                break; // label is unique per box
-            }
-        }
-        if (!done && instLens.focalLength != Lens.FOCAL_LENGTH_REMOVE_LENS) {
-            boxLenses.add(instLens);
-        }
-    }
-    private void executeInstruction_LHM(Lens instLens) {
-        int boxNumber = hash(instLens.label);
-        var boxLenses = boxes_LHM.get(boxNumber);
-        if (instLens.focalLength == Lens.FOCAL_LENGTH_REMOVE_LENS) {
-            boxLenses.remove(instLens.label);
-        } else {
-            boxLenses.merge(instLens.label, instLens, (lOld, lNew) -> lNew);
-        }
-    }
-
-    private long focusingPower_AL(List<Lens> box) {
-        return LongStream.range(0, box.size())
-                .map(li -> (li + 1) * box.get((int)li).focalLength)
-                .sum()
-                ;
-    }
-    private long focusingPower_LHM(Map<String, Lens> box) {
-        return Streams.zip(
-                        IntStream.iterate(1, i -> i + 1).boxed(),
-                        box.values().stream(),
-                        (i, lens) -> i * lens.focalLength
-                )
-                .mapToLong(l -> l)
-                .sum()
-                ;
-    }
-
-    @SolutionParser(partNumber = 1)
-    public void parsePart1() {
-        String line = stream().toList().getFirst();
-        instructions.addAll(Arrays.asList(line.split(",")));
-    }
-
-    @SolutionSolver(partNumber = 1)
-    public Object solvePart1() {
-        long result = instructions.stream().mapToLong(Day15::hash).sum();
-        return result;
-    }
-
-    @SolutionParser(partNumber = 2, solutionName = "LinkedHashMap")
-    public void parsePart2_LHM() {
-        parsePart1();
-        instructionLenses.addAll(instructions.stream().map(Lens::parse).toList());
-        IntStream.range(0, 256).forEach(i -> boxes_LHM.add(new LinkedHashMap<>()));
-    }
-
-    @SolutionSolver(partNumber = 2, solutionName = "LinkedHashMap")
-    public Object solvePart2_LHM() {
-        long result = 0;
-        instructionLenses.forEach(this::executeInstruction_LHM);
-        result = LongStream.range(0, boxes_LHM.size())
-                .map(bi -> (bi + 1) * focusingPower_LHM(boxes_LHM.get((int)bi)))
-                .sum()
-        ;
-        return result;
-    }
-
-    @SolutionParser(partNumber = 2, solutionName = "ArrayList")
-    public void parsePart2_AL() {
-        parsePart1();
-        instructionLenses.addAll(instructions.stream().map(Lens::parse).toList());
-        IntStream.range(0, 256).forEach(i -> boxes_AL.add(new ArrayList<>()));
-    }
-
-    @SolutionSolver(partNumber = 2, solutionName = "ArrayList")
-    public Object solvePart2_AL() {
-        instructionLenses.forEach(this::executeInstruction_AL);
-        long result = LongStream.range(0, boxes_AL.size())
-                .map(bi -> (bi + 1) * focusingPower_AL(boxes_AL.get((int)bi)))
-                .sum()
-                ;
-        return result;
     }
 
     public static class Day15Test {
@@ -170,21 +202,21 @@ public class Day15 extends Day {
         @Test
         void solvePart2_LHM_sample() {
             var day = new Day15("_sample");
-            day.parsePart2_LHM();
+            day.parsePart2();
             assertEquals(145L, day.solvePart2_LHM());
         }
 
         @Test
         void solvePart2_LHM_main() {
             var day = new Day15("");
-            day.parsePart2_LHM();
+            day.parsePart2();
             assertEquals(267372L, day.solvePart2_LHM());
         }
 
         @Test
         void solvePart2_AL_small() {
             var day = new Day15("_sample");
-            day.parsePart2_AL();
+            day.parsePart2();
             Object result = day.solvePart2_AL();
             assertEquals(145L, result);
         }
@@ -192,7 +224,7 @@ public class Day15 extends Day {
         @Test
         void solvePart2_AL_main() {
             var day = new Day15("");
-            day.parsePart2_AL();
+            day.parsePart2();
             Object result = day.solvePart2_AL();
             assertEquals(267372L, result);
         }
@@ -200,10 +232,10 @@ public class Day15 extends Day {
         @Test
         void solvePart2_ALandLHM_main() {
             var day_LHM = new Day15("");
-            day_LHM.parsePart2_LHM();
+            day_LHM.parsePart2();
             Object resultLHM = day_LHM.solvePart2_LHM();
             var day_AL = new Day15("");
-            day_AL.parsePart2_AL();
+            day_AL.parsePart2();
             Object resultAL = day_AL.solvePart2_AL();
             assertEquals(267372L, resultLHM);
             assertEquals(267372L, resultAL);
