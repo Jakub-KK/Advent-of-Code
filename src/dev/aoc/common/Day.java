@@ -126,7 +126,7 @@ public abstract class Day {
             // get singular parser for current name, if not defined, get singular default parser
             var parsersOfName = partParsersPerName.get(solverName);
             Method parser;
-            if (parsersOfName.isEmpty()) {
+            if (parsersOfName == null || parsersOfName.isEmpty()) {
                 var defaultParsers = partParsersPerName.get(DEFAULT_NAME);
                 if (defaultParsers.isEmpty()) {
                     throw new IllegalArgumentException("part %d default parser missing for name %s".formatted(partNumber, solverName));
@@ -154,12 +154,6 @@ public abstract class Day {
         System.out.printf("### Advent of Code %d day %02d, input \"%s\" size %d%n%n", aocYear, aocDay, inputSuffix, prefetchInput.length());
     }
 
-    public void run() {
-        showTitleAndPrefetchInput();
-        runPart(this::parsePart1, "", this::solvePart1, "", 1);
-        runPart(this::parsePart2, "", this::solvePart2, "", 2);
-    }
-
     private static final String DEFAULT_NAME = "default";
 
     private void runPart(Runnable parser, String parserName, Supplier<Object> solver, String solverName, int partNumber) {
@@ -180,14 +174,6 @@ public abstract class Day {
             System.out.printf("### Part %d, solver \"%s\": solver UNFINISHED%n%n", partNumber, solverName);
         }
     }
-
-    protected void parsePart1() {}
-
-    protected Object solvePart1() { return null; }
-
-    protected void parsePart2() {}
-
-    protected Object solvePart2() { return null; }
 
     public Stream<String> stream() {
         return inputStream().map(String::trim);
