@@ -29,7 +29,7 @@ public class Day21 extends Day {
 
     private static class GardenGrid extends Grid<Character> {
         public GardenGrid(List<String> lines, String elementDelimiter, Function<String, Character> parser) {
-            super(lines, elementDelimiter, parser, Character.valueOf(' ').getClass());
+            super(lines, elementDelimiter, parser, Character.class);
             // no tests were done for input grids of even dimensions
             if ((getWidth() & 1) == 0 || (getHeight() & 1) == 0) {
                 throw new IllegalArgumentException("input dimension not odd");

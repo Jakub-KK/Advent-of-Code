@@ -60,6 +60,10 @@ public abstract class Day {
     public static void run(Supplier<Day> dayFactory) {
         Day instance = dayFactory.get(); // we need instance to get class and methods, will be used later
         var dayClass = instance.getClass();
+        Benchmark dayBenchmarkAnnotation = dayClass.getDeclaredAnnotation(Benchmark.class);
+        if (dayBenchmarkAnnotation != null) {
+            System.out.println("TODO benchmarks"); // TODO benchmark support
+        }
         var declaredMethods = dayClass.getDeclaredMethods();
         var parsers = Arrays.stream(declaredMethods).filter(m -> m.isAnnotationPresent(SolutionParser.class)).toList();
         var solvers = Arrays.stream(declaredMethods).filter(m -> m.isAnnotationPresent(SolutionSolver.class)).toList();
@@ -74,12 +78,14 @@ public abstract class Day {
         instance.showTitleAndPrefetchInput();
         for (int partNumber : parts) {
             var partElementsPerName = getPartElementsPerName(partNumber, parsersPerPart, solversPerPart);
+            if (partElementsPerName == null) {
+                continue;
+            }
             for (var entry : partElementsPerName.entrySet()) {
                 if (instance == null) {
                     instance = dayFactory.get();
                 }
-                final Day instance_ = instance; // make it final for lambda usage
-                runParserSolver(partNumber, entry.getValue().getValue0(), entry.getValue().getValue1(), instance_);
+                runParserSolver(partNumber, entry.getValue().getValue0(), entry.getValue().getValue1(), instance);
                 instance = null; // instance is spent
             }
         }
@@ -112,8 +118,14 @@ public abstract class Day {
      */
     private static HashMap<String, Pair<Method, Method>> getPartElementsPerName(int partNumber, Map<Integer, List<Method>> parsersPerPart, Map<Integer, List<Method>> solversPerPart) {
         var partParsers = parsersPerPart.get(partNumber);
+        if (partParsers == null) {
+            return null;
+        }
         var partParsersPerName = partParsers.stream().collect(Collectors.groupingBy(m -> m.getDeclaredAnnotation(SolutionParser.class).solutionName()));
         var partSolvers = solversPerPart.get(partNumber);
+        if (partSolvers == null) {
+            return null;
+        }
         var partSolversPerName = partSolvers.stream().collect(Collectors.groupingBy(m -> m.getDeclaredAnnotation(SolutionSolver.class).solutionName()));
         var partElementsPerName = new HashMap<String, Pair<Method, Method>>();
         for (String solverName : partSolversPerName.keySet()) {

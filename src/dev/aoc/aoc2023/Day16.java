@@ -133,7 +133,7 @@ public class Day16 extends Day {
     }
 
     private void parse() {
-        mirrorGrid = new Grid<>(stream().toList(), "", s -> s.charAt(0), Character.valueOf(' ').getClass());
+        mirrorGrid = new Grid<>(stream().toList(), "", s -> s.charAt(0), Character.class);
         int countEmpty = mirrorGrid.count(c -> c == '.');
         int countSplitterVertical = mirrorGrid.count(c -> c == '|');
         int countSplitterHorizontal = mirrorGrid.count(c -> c == '-');

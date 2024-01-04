@@ -552,7 +552,6 @@ public class Day12 extends Day {
                 Instant finish = Instant.now();
                 System.out.printf("### %-20s elapsed for solver \"%s\"%n", Duration.between(start, finish).toString(), solverType);
             }
-
         }
     }
 }

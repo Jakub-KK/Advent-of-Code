@@ -291,6 +291,15 @@ public class Grid<T> {
                 case UNKNOWN -> UNKNOWN;
             };
         }
+        public int toScalar() {
+            return switch (this) {
+                case UP, NORTH -> 0;
+                case RIGHT, EAST -> 1;
+                case DOWN, SOUTH -> 2;
+                case LEFT, WEST -> 3;
+                case UNKNOWN -> -1;
+            };
+        }
     }
 
     public static class GridTest {

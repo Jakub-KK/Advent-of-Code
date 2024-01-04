@@ -29,7 +29,7 @@ public class Day10 extends Day {
 
     @SolutionParser(partNumber = 1)
     public void parsePart1() {
-        mapG = new Grid<>(stream().toList(), "", s -> s.charAt(0), Character.valueOf(' ').getClass());
+        mapG = new Grid<>(stream().toList(), "", s -> s.charAt(0), Character.class);
         mapG.forEach((p, ch) -> {
             if (ch == 'S') {
                 startX = p.getValue0();

@@ -28,7 +28,7 @@ public class Day23 extends Day {
         public final int maxSteps;
 
         public ForestGrid(List<String> lines, String elementDelimiter, Function<String, Character> parser) {
-            super(lines, elementDelimiter, parser, Character.valueOf(' ').getClass());
+            super(lines, elementDelimiter, parser, Character.class);
             // check for border of forest '#' with entry and exit paths '.'
             int borderCount = count((col, row) -> ((col == 0 || col == getWidth() - 1) || (row == 0 || row == getHeight() - 1)) && is(col, row, '#'));
             if (borderCount != 2 * getWidth() + 2 * getHeight() - 4 - 2) {
@@ -110,6 +110,11 @@ public class Day23 extends Day {
         @Override
         public long getId() {
             return forestGrid.getUniqueId(col, row);
+        }
+
+        @Override
+        public boolean equalsTarget(GraphNode target) {
+            return equals(target);
         }
 
         public boolean equals(PathNode that) {

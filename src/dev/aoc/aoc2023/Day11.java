@@ -32,7 +32,7 @@ public class Day11 extends Day {
     @SolutionParser(partNumber = 1)
     public void parsePart1() {
         // read map
-        map = new Grid<>(stream().toList(), "", c -> c.charAt(0), Character.valueOf(' ').getClass());
+        map = new Grid<>(stream().toList(), "", c -> c.charAt(0), Character.class);
     }
 
     @SolutionSolver(partNumber = 1)
