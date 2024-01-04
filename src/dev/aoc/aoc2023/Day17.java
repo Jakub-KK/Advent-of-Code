@@ -34,6 +34,57 @@ public class Day17 extends Day {
         // _test_rainbow_27x27, _test_rainbow_3x3
     }
 
+    @SolutionParser(partNumber = 1)
+    public void parsePart1() {
+        parse();
+    }
+
+    @SolutionSolver(partNumber = 1, solutionName = "JKK bottom-up")
+    public Object solvePart1_JKK() {
+        // the consensus on AoC reddit is to use Dijkstra's algorithm, for short and fast programs see https://old.reddit.com/r/adventofcode/comments/18k9ne5/2023_day_17_solutions/?sort=old
+        // instead, for 3 days, the different solution was created with sweat and blood...
+        // similar probably to dynamic programming, using brute-force and memoization
+        // builds from the target node walking through grid diagonals towards start node
+        return solve(SolverType.JKK_BOTTOMUP, 1, 3);
+    }
+
+    @SolutionSolver(partNumber = 1, solutionName = "A*")
+    public Object solvePart1_AStar() {
+        return solve(SolverType.ASTAR, 1, 3);
+    }
+
+    @SolutionParser(partNumber = 2)
+    public void parsePart2() {
+        parse();
+    }
+
+    @SolutionSolver(partNumber = 2, solutionName = "JKK bottom-up")
+    public Object solvePart2_JKK() {
+        return solve(SolverType.JKK_BOTTOMUP, 4, 10);
+    }
+
+    @SolutionSolver(partNumber = 2, solutionName = "A*")
+    public Object solvePart2_AStar() {
+        return solve(SolverType.ASTAR, 4, 10);
+    }
+
+    private void parse() {
+        var mapStrings = stream().collect(Collectors.toList());
+        Function<String, Integer> parser = Integer::parseInt;
+        if (this.getInputSuffix().contains("_blackhole_")) parser = CityGrid::parserBlackhole;
+        cityGrid = new CityGrid(mapStrings, "", parser, Integer.class);
+        System.out.printf("city grid %d x %d, hash %d%n", cityGrid.getWidth(), cityGrid.getHeight(), cityGrid.hashCode());
+        // System.out.println(cityGrid);
+    }
+
+    private long solve(SolverType solverType, int runMinimum, int runMaximum) {
+        CityGrid.Position positionStart = cityGrid.getPosition(0, 0);
+        CityGrid.Position positionTarget = cityGrid.getPosition(cityGrid.getWidth() - 1, cityGrid.getHeight() - 1);
+        return solverType.getSolver().solve(cityGrid, runMinimum, runMaximum, positionStart, positionTarget);
+    }
+
+    private CityGrid cityGrid;
+
     public static final int MAX_RUN_MAXIMUM = 10;
 
     private static class CityGrid extends Grid<Integer> {
@@ -110,57 +161,6 @@ public class Day17 extends Day {
         }
     }
 
-    private CityGrid cityGrid;
-
-    @SolutionParser(partNumber = 1)
-    public void parsePart1() {
-        parse();
-    }
-
-    @SolutionSolver(partNumber = 1, solutionName = "JKK bottom-up")
-    public Object solvePart1_JKK() {
-        // the consensus on AoC reddit is to use Dijkstra's algorithm, for short and fast programs see https://old.reddit.com/r/adventofcode/comments/18k9ne5/2023_day_17_solutions/?sort=old
-        // instead, for 3 days, the different solution was created with sweat and blood...
-        // similar probably to dynamic programming, using brute-force and memoization
-        // builds from the target node walking through grid diagonals towards start node
-        return solve(SolverType.JKK_BOTTOMUP, 1, 3);
-    }
-
-    @SolutionSolver(partNumber = 1, solutionName = "A*")
-    public Object solvePart1_AStar() {
-        return solve(SolverType.ASTAR, 1, 3);
-    }
-
-    @SolutionParser(partNumber = 2)
-    public void parsePart2() {
-        parse();
-    }
-
-    @SolutionSolver(partNumber = 2, solutionName = "JKK bottom-up")
-    public Object solvePart2_JKK() {
-        return solve(SolverType.JKK_BOTTOMUP, 4, 10);
-    }
-
-    @SolutionSolver(partNumber = 2, solutionName = "A*")
-    public Object solvePart2_AStar() {
-        return solve(SolverType.ASTAR, 4, 10);
-    }
-
-    private void parse() {
-        var mapStrings = stream().collect(Collectors.toList());
-        Function<String, Integer> parser = Integer::parseInt;
-        if (this.getInputSuffix().contains("_blackhole_")) parser = CityGrid::parserBlackhole;
-        cityGrid = new CityGrid(mapStrings, "", parser, Integer.class);
-        System.out.printf("city grid %d x %d, hash %d%n", cityGrid.getWidth(), cityGrid.getHeight(), cityGrid.hashCode());
-        // System.out.println(cityGrid);
-    }
-
-    private long solve(SolverType solverType, int runMinimum, int runMaximum) {
-        CityGrid.Position positionStart = cityGrid.getPosition(0, 0);
-        CityGrid.Position positionTarget = cityGrid.getPosition(cityGrid.getWidth() - 1, cityGrid.getHeight() - 1);
-        return solverType.getSolver().solve(cityGrid, runMinimum, runMaximum, positionStart, positionTarget);
-    }
-
     private enum SolverType {
         JKK_BOTTOMUP {
             @Override
@@ -210,7 +210,9 @@ public class Day17 extends Day {
      * Uses previously written A* route finder
      */
     private static class SolverAStar extends SolverBase {
-        private static record StateNode(CityGrid.Position position, Axis axisPrevious) implements GraphNode {
+        /** A* will search graph with nodes of city grid position and axis of previous move (vertical/horizontal).
+         * Axis as part of state is required because in this graph we change axis in every move, as moves are multiple grid cells */
+        private record StateNode(CityGrid.Position position, Axis axisPrevious) implements GraphNode {
             @Override
             public long getId() {
                 return position.getId() * 2L + axisPrevious.ordinal();
@@ -224,7 +226,7 @@ public class Day17 extends Day {
                     };
                 }
             }
-            /** Target equality ignores incoming direction. */
+            /** Target equality ignores axis */
             @Override
             public boolean equalsTarget(GraphNode target) {
                 if (this == target) return true;
@@ -248,13 +250,14 @@ public class Day17 extends Day {
                 return "[%s,%s]".formatted(position, axisPrevious.toString().charAt(0));
             }
         }
+        /** A* will search graph where every vertex is position + axis of previous move, edges are moves of multiple grid cells. */
         private record StateGraph(CityGrid cityGrid, int runMinimum, int runMaximum) implements Graph<StateNode> {
             @Override
             public StateNode getNode(long id) {
                 throw new IllegalStateException("not implemented");
             }
-            private static final Grid.Direction[] directionsHorizontal = new Grid.Direction[]{ Grid.Direction.LEFT, Grid.Direction.RIGHT };
-            private static final Grid.Direction[] directionsVertical = new Grid.Direction[]{ Grid.Direction.UP, Grid.Direction.DOWN };
+            private static final Grid.Direction[] directionsHorizontal = new Grid.Direction[] { Grid.Direction.LEFT, Grid.Direction.RIGHT };
+            private static final Grid.Direction[] directionsVertical = new Grid.Direction[] { Grid.Direction.UP, Grid.Direction.DOWN };
             @Override
             public Set<StateNode> getEdges(StateNode node) {
                 HashSet<StateNode> result = new HashSet<>();
@@ -278,35 +281,80 @@ public class Day17 extends Day {
                 return result;
             }
         }
+        /** Cost (score) between nodes is sum of city grid cell ("heat loss" from the story) */
         private record NextNodeScorer(CityGrid cityGrid) implements Scorer<StateNode> {
             @Override
             public long computeCost(StateNode from, StateNode to) {
-                    int col = from.position.col, row = from.position.row;
-                    int dCol = Integer.compare(to.position.col - col, 0);
-                    int dRow = Integer.compare(to.position.row - row, 0);
-                    if (dCol == 0 && dRow == 0) {
-                        throw new IllegalArgumentException("the same nodes given to scorer: from %s, to %s".formatted(from, to));
-                    }
-                    long result = 0;
-                    while (col != to.position.col || row != to.position.row) {
-                        col += dCol;
-                        row += dRow;
-                        result += cityGrid.get(col, row);
-                    }
-                    return result;
+                int col = from.position.col, row = from.position.row;
+                int dCol = Integer.compare(to.position.col - col, 0);
+                int dRow = Integer.compare(to.position.row - row, 0);
+                if (dCol == 0 && dRow == 0) {
+                    throw new IllegalArgumentException("the same nodes given to scorer: from %s, to %s".formatted(from, to));
+                } else if (dCol != 0 & dRow != 0) {
+                    throw new IllegalArgumentException("diagonal moves not supported: from %s, to %s".formatted(from, to));
                 }
+                long result = 0;
+                while (col != to.position.col || row != to.position.row) {
+                    col += dCol;
+                    row += dRow;
+                    result += cityGrid.get(col, row);
+                }
+                return result;
+            }
         }
-        private static class TargetNodeScorer implements Scorer<StateNode> {
-            private final Map<CityGrid.Position, Long> minScore;
-            private final Grid<Long> minScoreGrid;
-            public TargetNodeScorer(CityGrid cityGrid, CityGrid.Position target) {
-                if (true) {
+        /** Target node scorer guides route finder search to steer it towards target more effectively */
+        private static class TargetNodeScorers {
+            private enum Type {
+                ZERO {
+                    @Override
+                    public Scorer<StateNode> getScorer(CityGrid cityGrid, CityGrid.Position target) {
+                        return new ZeroScorer();
+                    }
+                },
+                MANHATTAN {
+                    @Override
+                    public Scorer<StateNode> getScorer(CityGrid cityGrid, CityGrid.Position target) {
+                        return new ManhattanDistanceScorer();
+                    }
+                },
+                NAIVE_PATH_COST {
+                    @Override
+                    public Scorer<StateNode> getScorer(CityGrid cityGrid, CityGrid.Position target) {
+                        return new NaivePathCostScorer(cityGrid, target);
+                    }
+                };
+                public abstract Scorer<StateNode> getScorer(CityGrid cityGrid, CityGrid.Position target);
+            }
+            /** For testing: always returns 0. Can be used to assess cost of using target node scorer at all. */
+            private static class ZeroScorer implements Scorer<StateNode> {
+                @Override
+                public long computeCost(StateNode from, StateNode to) {
+                    return 0;
+                }
+            }
+            /** Returns manhattan distance between nodes */
+            private static class ManhattanDistanceScorer implements Scorer<StateNode> {
+                @Override
+                public long computeCost(StateNode from, StateNode to) {
+                    return Math.abs(from.position.col - to.position.col) + Math.abs(from.position.row - to.position.row);
+                }
+            }
+            /** Returns minimal cost from node to target node as if any path was permitted. Found by running Dijkstra on city grid. */
+            private static class NaivePathCostScorer implements Scorer<StateNode> {
+                private final Map<CityGrid.Position, Long> minScore;
+                private final Grid<Long> minScoreGrid;
+                public NaivePathCostScorer(CityGrid cityGrid, CityGrid.Position target) {
                     Instant searchStart = Instant.now();
                     // traverse graph from target node to calculate least scored path for every grid position (without puzzle constraints)
                     // this will be used as heuristic estimator for A* search guidance
                     RouteFinderDijkstra<CityGrid.Position> graphDijkstra = new RouteFinderDijkstra<>(
                             new GridGraph(cityGrid),
-                            (from, to) -> cityGrid.get(to.col, to.row)
+                            (from, to) -> {
+                                if (Math.abs(from.col - to.col) + Math.abs(from.row - to.row) != 1) {
+                                    throw new IllegalArgumentException("moves longer than 1 step not supported, from %s to %s".formatted(from, to));
+                                }
+                                return cityGrid.get(to.col, to.row);
+                            }
                     );
                     minScore = graphDijkstra.search(target);
                     Instant searchFinish = Instant.now();
@@ -316,45 +364,40 @@ public class Day17 extends Day {
                         CityGrid.Position pos = minScoreEntry.getKey();
                         minScoreGrid.set(pos.col, pos.row, minScoreEntry.getValue());
                     }
-                } else {
-                    minScore = null;
-                    minScoreGrid = null;
-                }
-            }
-            private long hits = 0;
-            @Override
-            public long computeCost(StateNode from, StateNode to) { // assert to.equals(target)
-                // hits++;
-                return 0L;
-                // return minScoreGrid.get(from.position.col, from.position.row);
-                // return minScore.get(from.position);
-                // return Math.abs(from.position.col - to.position.col) + Math.abs(from.position.row - to.position.row);
-            }
-            private record GridGraph(CityGrid cityGrid) implements Graph<CityGrid.Position> {
-                @Override
-                public CityGrid.Position getNode(long id) {
-                    throw new IllegalStateException("not implemented");
                 }
                 @Override
-                public Set<CityGrid.Position> getEdges(CityGrid.Position pos) {
-                    HashSet<CityGrid.Position> result = new HashSet<>();
-                    int col = pos.col, row = pos.row;
-                    for (Grid.Direction direction : Grid.Direction.getAll()) {
-                        int newCol = col + direction.dCol, newRow = row + direction.dRow;
-                        if (cityGrid.hasPos(newCol, newRow)) {
-                            result.add(cityGrid.getPosition(newCol, newRow));
-                        }
+                public long computeCost(StateNode from, StateNode to) { // assert to.equals(target)
+                    return minScoreGrid.get(from.position.col, from.position.row);
+                    // return minScore.get(from.position);
+                }
+                private record GridGraph(CityGrid cityGrid) implements Graph<CityGrid.Position> {
+                    @Override
+                    public CityGrid.Position getNode(long id) {
+                        throw new IllegalStateException("not implemented");
                     }
-                    return result;
+                    @Override
+                    public Set<CityGrid.Position> getEdges(CityGrid.Position pos) {
+                        HashSet<CityGrid.Position> result = new HashSet<>();
+                        int col = pos.col, row = pos.row;
+                        for (Grid.Direction direction : Grid.Direction.getAll()) {
+                            int newCol = col + direction.dCol, newRow = row + direction.dRow;
+                            if (cityGrid.hasPos(newCol, newRow)) {
+                                result.add(cityGrid.getPosition(newCol, newRow));
+                            }
+                        }
+                        return result;
+                    }
                 }
             }
         }
         @Override
         public long solve() {
+            boolean useTargetNodeScorer = false; // testing shows that fastest is null (no target scoring), maybe used scorer (sum of cell costs) is unfit for purpose?
+            TargetNodeScorers.Type targetNodeScorerType = TargetNodeScorers.Type.NAIVE_PATH_COST;
             RouteFinder<StateNode> routeFinder = new RouteFinderAStar<>(
                     new StateGraph(cityGrid, runMinimum, runMaximum),
                     new NextNodeScorer(cityGrid),
-                    null//new TargetNodeScorer(cityGrid, target) // TODO: makes searching longer ! 0-estimator is faster
+                    useTargetNodeScorer ? targetNodeScorerType.getScorer(cityGrid, target) : null
             );
             // if (true) return 0;
             StateNode start1 = new StateNode(start, StateNode.Axis.HORIZONTAL);
