@@ -2,24 +2,27 @@ package dev.aoc.common.graphsearch;
 
 import java.util.Objects;
 
+/** A node on the route, contains its associated graph node, previous route node and current route score. */
 public class RouteNode<T extends GraphNode> implements Comparable<RouteNode<T>> {
-    private final T current;
-    private RouteNode<T> previous;
-    private long routeScore;
-    private long estimatedScore;
+    protected final T current;
+    protected RouteNode<T> previous;
+    protected long routeScore;
 
     public RouteNode(T current) {
-        this(current, null, Long.MAX_VALUE, Long.MAX_VALUE);
+        this(current, null, Long.MAX_VALUE);
     }
 
-    public RouteNode(T current, RouteNode<T> previous, long routeScore, long estimatedScore) {
+    public RouteNode(T current, RouteNode<T> previous, long routeScore) {
         if (current == null) {
             throw new IllegalArgumentException("graph node must not be null");
         }
         this.current = current;
         this.previous = previous;
         this.routeScore = routeScore;
-        this.estimatedScore = estimatedScore;
+    }
+
+    public boolean isUninitialized() {
+        return routeScore == Long.MAX_VALUE;
     }
 
     public T getCurrent() {
@@ -42,10 +45,6 @@ public class RouteNode<T extends GraphNode> implements Comparable<RouteNode<T>> 
         this.routeScore = routeScore;
     }
 
-    public void setEstimatedScore(long estimatedScore) {
-        this.estimatedScore = estimatedScore;
-    }
-
     public boolean equals(RouteNode<T> that) {
         return current.equals(that.current);
     }
@@ -60,16 +59,16 @@ public class RouteNode<T extends GraphNode> implements Comparable<RouteNode<T>> 
 
     @Override
     public int hashCode() {
-        return Objects.hash(current);
+        return Objects.hashCode(current);
     }
 
     @Override
     public int compareTo(RouteNode other) {
-        return Long.compare(this.estimatedScore, other.estimatedScore);
+        return Long.compare(this.routeScore, other.routeScore);
     }
 
     @Override
     public String toString() {
-        return "{%s << %s|%d,%d}".formatted(current, previous != null ? previous : "0", routeScore, estimatedScore);
+        return "[%s << %s|%d]".formatted(current, previous != null ? previous : "{}", routeScore);
     }
 }

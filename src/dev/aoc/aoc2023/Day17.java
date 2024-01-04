@@ -1,10 +1,14 @@
 package dev.aoc.aoc2023;
 
 import dev.aoc.common.*;
+import dev.aoc.common.graphsearch.*;
 import org.javatuples.Pair;
 import org.javatuples.Triplet;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.*;
@@ -12,21 +16,25 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@Benchmark(run = false, cycles = 10, inputSuffix = "_test_blackhole_loopy_202x202", partNumber = 1, solutionName = "A*")
 public class Day17 extends Day {
     public Day17(String inputSuffix) {
         super(inputSuffix);
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day17(""));
+        Day.run(() -> new Day17("_sample"));
         // _main_subset_20x20
         // _sample, _sample_subset_3x2
         // _sample_subset_9x2, _sample_subset_9x3
         // _sample_subset_10x10, _sample_subset_12x5, _sample_subset_13x6, _sample_subset_13x8, _sample_subset_12x11
-        // _test_meandering, _test_meandering_loopy, _test_meandering_loopy_small0, _test_meandering_loopy_small1
-        // _test_2way_12x12, _test_rainbow, _test_rainbow_3x3
-        // _test_blackhole_loopy, _test_blackhole_loopy_hard
+        // _test_meandering_9x9, _test_meandering_loopy_24x24_2, _test_meandering_loopy_24x24_2, _test_meandering_loopy_30x30
+        // _test_2way_12x12, _test_directionmatters
+        // _test_blackhole_loopy_7x7_harder, _test_blackhole_loopy_8x8_easier, _test_blackhole_loopy_202x202
+        // _test_rainbow_27x27, _test_rainbow_3x3
     }
+
+    public static final int MAX_RUN_MAXIMUM = 10;
 
     private static class CityGrid extends Grid<Integer> {
         public CityGrid(List<String> lines, String elementDelimiter, Function<String, Integer> parser, Class<?> elementClass) {
@@ -57,9 +65,9 @@ public class Day17 extends Day {
             return positions.get(id);
         }
 
-        private static final Map<Integer, Position> positions = new HashMap<>();
+        private final Map<Integer, Position> positions = new HashMap<>();
 
-        public static class Position {
+        public static class Position implements GraphNode {
             public final int col;
             public final int row;
             public final int id;
@@ -70,26 +78,34 @@ public class Day17 extends Day {
                 this.id = id;
             }
 
-            public int getId() {
+            public long getId() {
                 return id;
+            }
+
+            @Override
+            public boolean equalsTarget(GraphNode target) {
+                if (this == target) return true;
+                if (target == null || getClass() != target.getClass()) return false;
+                Position targetPosition = (Position)target;
+                return id == targetPosition.id;
             }
 
             @Override
             public boolean equals(Object o) {
                 if (this == o) return true;
                 if (o == null || getClass() != o.getClass()) return false;
-                Day17.CityGrid.Position node = (Day17.CityGrid.Position) o;
+                CityGrid.Position node = (CityGrid.Position) o;
                 return id == node.id;
             }
 
             @Override
             public int hashCode() {
-                return Objects.hash(id);
+                return Integer.hashCode(id);
             }
 
             @Override
             public String toString() {
-                return "[%d,%d|%d]".formatted(col, row, id);
+                return "(%d,%d)".formatted(col, row/*, id*/);
             }
         }
     }
@@ -101,14 +117,18 @@ public class Day17 extends Day {
         parse();
     }
 
-    @SolutionSolver(partNumber = 1)
-    public Object solvePart1() {
+    @SolutionSolver(partNumber = 1, solutionName = "JKK bottom-up")
+    public Object solvePart1_JKK() {
         // the consensus on AoC reddit is to use Dijkstra's algorithm, for short and fast programs see https://old.reddit.com/r/adventofcode/comments/18k9ne5/2023_day_17_solutions/?sort=old
-        // instead, for 3 days, the different solution was created...
-        // probably dynamic programming, using brute-force and memoization
+        // instead, for 3 days, the different solution was created with sweat and blood...
+        // similar probably to dynamic programming, using brute-force and memoization
         // builds from the target node walking through grid diagonals towards start node
-        Solver solver = new Solver(1, 3, cityGrid.getPosition(0, 0), cityGrid.getPosition(cityGrid.getWidth() - 1, cityGrid.getHeight() - 1));
-        return solver.solve();
+        return solve(SolverType.JKK_BOTTOMUP, 1, 3);
+    }
+
+    @SolutionSolver(partNumber = 1, solutionName = "A*")
+    public Object solvePart1_AStar() {
+        return solve(SolverType.ASTAR, 1, 3);
     }
 
     @SolutionParser(partNumber = 2)
@@ -116,34 +136,263 @@ public class Day17 extends Day {
         parse();
     }
 
-    @SolutionSolver(partNumber = 2)
-    public Object solvePart2() {
-        Solver solver = new Solver(4, 10, cityGrid.getPosition(0, 0), cityGrid.getPosition(cityGrid.getWidth() - 1, cityGrid.getHeight() - 1));
-        return solver.solve();
+    @SolutionSolver(partNumber = 2, solutionName = "JKK bottom-up")
+    public Object solvePart2_JKK() {
+        return solve(SolverType.JKK_BOTTOMUP, 4, 10);
+    }
+
+    @SolutionSolver(partNumber = 2, solutionName = "A*")
+    public Object solvePart2_AStar() {
+        return solve(SolverType.ASTAR, 4, 10);
     }
 
     private void parse() {
         var mapStrings = stream().collect(Collectors.toList());
         Function<String, Integer> parser = Integer::parseInt;
         if (this.getInputSuffix().contains("_blackhole_")) parser = CityGrid::parserBlackhole;
-        cityGrid = new CityGrid(mapStrings, "", parser, Integer.valueOf(0).getClass());
+        cityGrid = new CityGrid(mapStrings, "", parser, Integer.class);
         System.out.printf("city grid %d x %d, hash %d%n", cityGrid.getWidth(), cityGrid.getHeight(), cityGrid.hashCode());
         // System.out.println(cityGrid);
     }
 
-    private class Solver {
-        private final int MIN_STEPS;
-        private final int MAX_STEPS;
-        private final CityGrid.Position start;
-        private final CityGrid.Position target;
+    private long solve(SolverType solverType, int runMinimum, int runMaximum) {
+        CityGrid.Position positionStart = cityGrid.getPosition(0, 0);
+        CityGrid.Position positionTarget = cityGrid.getPosition(cityGrid.getWidth() - 1, cityGrid.getHeight() - 1);
+        return solverType.getSolver().solve(cityGrid, runMinimum, runMaximum, positionStart, positionTarget);
+    }
 
-        public Solver(int MIN_STEPS, int MAX_STEPS, CityGrid.Position start, CityGrid.Position target) {
-            this.MIN_STEPS = MIN_STEPS;
-            this.MAX_STEPS = MAX_STEPS;
+    private enum SolverType {
+        JKK_BOTTOMUP {
+            @Override
+            public ISolver getSolver() {
+                return new SolverJKK();
+            }
+        },
+        ASTAR {
+            @Override
+            public ISolver getSolver() {
+                return new SolverAStar();
+            }
+        };
+        public abstract ISolver getSolver();
+    }
+
+    private interface ISolver {
+        long solve(CityGrid cityGrid, int runMinimum, int runMaximum, CityGrid.Position start, CityGrid.Position target);
+    }
+
+    private static abstract class SolverBase implements ISolver {
+        protected CityGrid cityGrid;
+        protected int runMinimum;
+        protected int runMaximum;
+        protected CityGrid.Position start;
+        protected CityGrid.Position target;
+
+        @Override
+        public long solve(CityGrid cityGrid, int runMinimum, int runMaximum, CityGrid.Position start, CityGrid.Position target) {
+            this.cityGrid = cityGrid;
+            this.runMinimum = runMinimum;
+            this.runMaximum = runMaximum;
+            if (this.runMaximum > MAX_RUN_MAXIMUM) {
+                throw new IllegalArgumentException("too large value %d of runMaximum, max is %d".formatted(runMaximum, MAX_RUN_MAXIMUM));
+            }
             this.start = start;
             this.target = target;
+            return solve();
         }
 
+        protected abstract long solve();
+    }
+
+    /** (/u/morgoth1145 from reddit/r/adventofcode) A* over state space of (position, previous direction) and next move changing direction (one move is many steps on the grid)
+     * source: https://old.reddit.com/r/adventofcode/comments/18k9ne5/2023_day_17_solutions/kdpwy80/
+     * repo: https://github.com/morgoth1145/advent-of-code/blob/2023-python/2023/17/solution.py
+     * Uses previously written A* route finder
+     */
+    private static class SolverAStar extends SolverBase {
+        private static record StateNode(CityGrid.Position position, Axis axisPrevious) implements GraphNode {
+            @Override
+            public long getId() {
+                return position.getId() * 2L + axisPrevious.ordinal();
+            }
+            public enum Axis { // axis of movement
+                HORIZONTAL, VERTICAL;
+                public Axis turn() {
+                    return switch (this) {
+                        case HORIZONTAL -> VERTICAL;
+                        case VERTICAL -> HORIZONTAL;
+                    };
+                }
+            }
+            /** Target equality ignores incoming direction. */
+            @Override
+            public boolean equalsTarget(GraphNode target) {
+                if (this == target) return true;
+                if (target == null || getClass() != target.getClass()) return false;
+                StateNode stateNode = (StateNode) target;
+                return Objects.equals(position, stateNode.position);
+            }
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) return true;
+                if (o == null || getClass() != o.getClass()) return false;
+                StateNode stateNode = (StateNode) o;
+                return Objects.equals(position, stateNode.position) && Objects.equals(axisPrevious, stateNode.axisPrevious);
+            }
+            @Override
+            public int hashCode() {
+                return Objects.hash(position, axisPrevious);
+            }
+            @Override
+            public String toString() {
+                return "[%s,%s]".formatted(position, axisPrevious.toString().charAt(0));
+            }
+        }
+        private record StateGraph(CityGrid cityGrid, int runMinimum, int runMaximum) implements Graph<StateNode> {
+            @Override
+            public StateNode getNode(long id) {
+                throw new IllegalStateException("not implemented");
+            }
+            private static final Grid.Direction[] directionsHorizontal = new Grid.Direction[]{ Grid.Direction.LEFT, Grid.Direction.RIGHT };
+            private static final Grid.Direction[] directionsVertical = new Grid.Direction[]{ Grid.Direction.UP, Grid.Direction.DOWN };
+            @Override
+            public Set<StateNode> getEdges(StateNode node) {
+                HashSet<StateNode> result = new HashSet<>();
+                StateNode.Axis newAxis = node.axisPrevious.turn();
+                Grid.Direction[] newDirections = switch (newAxis) {
+                    case HORIZONTAL -> directionsHorizontal;
+                    case VERTICAL -> directionsVertical;
+                };
+                for (Grid.Direction newDirection : newDirections) {
+                    int newCol = node.position.col + newDirection.dCol * (runMinimum - 1);
+                    int newRow = node.position.row + newDirection.dRow * (runMinimum - 1);
+                    for (int runSteps = runMinimum; runSteps <= runMaximum; runSteps++) {
+                        newCol += newDirection.dCol;
+                        newRow += newDirection.dRow;
+                        if (!cityGrid.hasPos(newCol, newRow)) {
+                            break;
+                        }
+                        result.add(new StateNode(cityGrid.getPosition(newCol, newRow), newAxis));
+                    }
+                }
+                return result;
+            }
+        }
+        private record NextNodeScorer(CityGrid cityGrid) implements Scorer<StateNode> {
+            @Override
+            public long computeCost(StateNode from, StateNode to) {
+                    int col = from.position.col, row = from.position.row;
+                    int dCol = Integer.compare(to.position.col - col, 0);
+                    int dRow = Integer.compare(to.position.row - row, 0);
+                    if (dCol == 0 && dRow == 0) {
+                        throw new IllegalArgumentException("the same nodes given to scorer: from %s, to %s".formatted(from, to));
+                    }
+                    long result = 0;
+                    while (col != to.position.col || row != to.position.row) {
+                        col += dCol;
+                        row += dRow;
+                        result += cityGrid.get(col, row);
+                    }
+                    return result;
+                }
+        }
+        private static class TargetNodeScorer implements Scorer<StateNode> {
+            private final Map<CityGrid.Position, Long> minScore;
+            private final Grid<Long> minScoreGrid;
+            public TargetNodeScorer(CityGrid cityGrid, CityGrid.Position target) {
+                if (true) {
+                    Instant searchStart = Instant.now();
+                    // traverse graph from target node to calculate least scored path for every grid position (without puzzle constraints)
+                    // this will be used as heuristic estimator for A* search guidance
+                    RouteFinderDijkstra<CityGrid.Position> graphDijkstra = new RouteFinderDijkstra<>(
+                            new GridGraph(cityGrid),
+                            (from, to) -> cityGrid.get(to.col, to.row)
+                    );
+                    minScore = graphDijkstra.search(target);
+                    Instant searchFinish = Instant.now();
+                    System.out.printf("### graph search to estimate path costs [elapsed: %s]%n", Duration.between(searchStart, searchFinish).toString());
+                    minScoreGrid = new Grid<>(cityGrid.getWidth(), cityGrid.getHeight(), 0L, ",");
+                    for (Map.Entry<CityGrid.Position, Long> minScoreEntry : minScore.entrySet()) {
+                        CityGrid.Position pos = minScoreEntry.getKey();
+                        minScoreGrid.set(pos.col, pos.row, minScoreEntry.getValue());
+                    }
+                } else {
+                    minScore = null;
+                    minScoreGrid = null;
+                }
+            }
+            private long hits = 0;
+            @Override
+            public long computeCost(StateNode from, StateNode to) { // assert to.equals(target)
+                // hits++;
+                return 0L;
+                // return minScoreGrid.get(from.position.col, from.position.row);
+                // return minScore.get(from.position);
+                // return Math.abs(from.position.col - to.position.col) + Math.abs(from.position.row - to.position.row);
+            }
+            private record GridGraph(CityGrid cityGrid) implements Graph<CityGrid.Position> {
+                @Override
+                public CityGrid.Position getNode(long id) {
+                    throw new IllegalStateException("not implemented");
+                }
+                @Override
+                public Set<CityGrid.Position> getEdges(CityGrid.Position pos) {
+                    HashSet<CityGrid.Position> result = new HashSet<>();
+                    int col = pos.col, row = pos.row;
+                    for (Grid.Direction direction : Grid.Direction.getAll()) {
+                        int newCol = col + direction.dCol, newRow = row + direction.dRow;
+                        if (cityGrid.hasPos(newCol, newRow)) {
+                            result.add(cityGrid.getPosition(newCol, newRow));
+                        }
+                    }
+                    return result;
+                }
+            }
+        }
+        @Override
+        public long solve() {
+            RouteFinder<StateNode> routeFinder = new RouteFinderAStar<>(
+                    new StateGraph(cityGrid, runMinimum, runMaximum),
+                    new NextNodeScorer(cityGrid),
+                    null//new TargetNodeScorer(cityGrid, target) // TODO: makes searching longer ! 0-estimator is faster
+            );
+            // if (true) return 0;
+            StateNode start1 = new StateNode(start, StateNode.Axis.HORIZONTAL);
+            StateNode start2 = new StateNode(start, StateNode.Axis.VERTICAL);
+            StateNode end = new StateNode(target, StateNode.Axis.VERTICAL); // axis will be ignored when testing for target
+            Pair<List<StateNode>, Long> route = routeFinder.findRoute(List.of(start1, start2), end);
+            List<StateNode> path = route.getValue0();
+            if (false) {
+                System.out.printf("%d %s%n", route.getValue1(), String.join(",", path.stream().map(StateNode::toString).toList()));
+                System.out.printf("path hash %d%n", Arrays.hashCode(path.toArray(new StateNode[0])));
+                debugShowPath("winner", path);
+            }
+            return route.getValue1();
+        }
+
+        private void debugShowPath(String title, List<StateNode> path) {
+            Grid<Character> pathMap = new Grid<>(cityGrid.getWidth(), cityGrid.getHeight(), '.', "");
+            pathMap.set(path.getFirst().position.col, path.getFirst().position.row, '*');
+            char[] routeSymbols = "<>^v".toCharArray();
+            for (int ri = 1; ri < path.size(); ri++) {
+                StateNode node = path.get(ri), prevNode = path.get(ri - 1);
+                int dCol = Math.clamp(node.position.col - prevNode.position.col, -1, 1);
+                int dRow = Math.clamp(node.position.row - prevNode.position.row, -1, 1);
+                int col = prevNode.position.col, row = prevNode.position.row;
+                while (col != node.position.col || row != node.position.row) {
+                    col += dCol;
+                    row += dRow;
+                    pathMap.set(col, row, routeSymbols[row - prevNode.position.row == 0 ? ((1 + Math.clamp(col - prevNode.position.col, -1, 1)) / 2) : (2 + (1 + Math.clamp(row - prevNode.position.row, -1, 1)) / 2)]);
+                }
+            }
+            if (title != null && !title.trim().isEmpty()) {
+                System.out.println(title);
+            }
+            System.out.println(pathMap);
+        }
+    }
+
+    private static class SolverJKK extends SolverBase {
         private enum Direction {
             UNKNOWN(-1), DOWN(0), LEFT(1), UP(2), RIGHT(3);
             public final int dir;
@@ -163,7 +412,7 @@ public class Day17 extends Day {
 
         private Map<Integer, Pair<Integer, CityGrid.Position>> bestPathsForConstraintAndNode;
         private int bestPathsForConstraintAndNodeMemoKey(Direction lastDir, int lastStepsInTheSameDir, int nodeId) {
-            return lastDir.dir + 4 * (lastStepsInTheSameDir - 1 + MAX_STEPS * nodeId);
+            return lastDir.dir + 4 * (lastStepsInTheSameDir - 1 + runMaximum * nodeId);
         }
 
         private void memoAll() {
@@ -201,22 +450,22 @@ public class Day17 extends Day {
         private void memoAll(int startCol, int startRow, int memoBestScore) {
             Pathfinder pathfinder = new Pathfinder(cityGrid.getPosition(startCol, startRow), target, null, memoBestScore);
             if (startCol != 0) {
-                for (int steps = 1; steps <= MAX_STEPS && startCol - steps >= 0; steps++) {
+                for (int steps = 1; steps <= runMaximum && startCol - steps >= 0; steps++) {
                     pathfinder.pathMark(startCol - steps, startRow, true);
                     pathfinder.setBestScore(memoBestScore);
                     pathfinder.findPath(0, steps, 0, Direction.RIGHT);
                 }
-                for (int steps = 1; steps <= MAX_STEPS && startCol - steps >= 0; steps++) {
+                for (int steps = 1; steps <= runMaximum && startCol - steps >= 0; steps++) {
                     pathfinder.pathMark(startCol - steps, startRow, false);
                 }
             }
             if (startRow != 0) {
-                for (int steps = 1; steps <= MAX_STEPS && startRow - steps >= 0; steps++) {
+                for (int steps = 1; steps <= runMaximum && startRow - steps >= 0; steps++) {
                     pathfinder.pathMark(startCol, startRow - steps, true);
                     pathfinder.setBestScore(memoBestScore);
                     pathfinder.findPath(0, 0, steps, Direction.DOWN);
                 }
-                for (int steps = 1; steps <= MAX_STEPS && startRow - steps >= 0; steps++) {
+                for (int steps = 1; steps <= runMaximum && startRow - steps >= 0; steps++) {
                     pathfinder.pathMark(startCol, startRow - steps, false);
                 }
             }
@@ -248,9 +497,9 @@ public class Day17 extends Day {
             for (Map.Entry<Integer, Pair<Integer, CityGrid.Position>> entry : bestPathsForConstraintAndNode.entrySet()) {
                 int key = entry.getKey();
                 // memoKey = lastDir + 4 * (lastStepsInTheSameDir - 1 + MAX_STEPS * current.getId());
-                int nodeId = key / 4 / MAX_STEPS;
+                int nodeId = key / 4 / runMaximum;
                 Direction lastDir = Direction.fromValue(key % 4);
-                int lastStepsInTheSameDir = (key / 4) % MAX_STEPS + 1;
+                int lastStepsInTheSameDir = (key / 4) % runMaximum + 1;
                 CityGrid.Position node = cityGrid.getPosition(nodeId);
                 CityGrid.Position memoNode = entry.getValue().getValue1();
                 List<Triplet<Direction, Integer, CityGrid.Position>> memos;
@@ -264,7 +513,7 @@ public class Day17 extends Day {
                     memoCheck.set(node.col, node.row, memos);
                 }
                 memos.add(new Triplet<>(lastDir, lastStepsInTheSameDir, memoNode));
-                memos.sort(Comparator.comparingInt(n -> (n.getValue0().dir * MAX_STEPS + (n.getValue1() - 1)) * cityGrid.getUniqueIdMax() + n.getValue2().getId()));
+                memos.sort(Comparator.comparingInt(n -> (n.getValue0().dir * runMaximum + (n.getValue1() - 1)) * cityGrid.getUniqueIdMax() + (int)n.getValue2().getId()));
             }
             return;
         }
@@ -319,7 +568,7 @@ public class Day17 extends Day {
                 Integer memoKey = null;
                 if (lastDir != Direction.UNKNOWN) {
                     int lastStepsInTheSameDir = Math.max(stepsRows, stepsCols);
-                    memoKey = bestPathsForConstraintAndNodeMemoKey(lastDir, lastStepsInTheSameDir, current.getId());
+                    memoKey = bestPathsForConstraintAndNodeMemoKey(lastDir, lastStepsInTheSameDir, (int)current.getId());
                     Pair<Integer, CityGrid.Position> memoBest = bestPathsForConstraintAndNode.get(memoKey);
                     memoQueries++;
                     if (memoBest != null) {
@@ -333,7 +582,7 @@ public class Day17 extends Day {
                             // debugShowPath(path);
                             if (bestScore > bestPathScore) {
                                 memoSuccesses++;
-                                if (path.getFirst().getId() == 0) {
+                                if (false && path.getFirst().getId() == 0) {
                                     System.out.printf("memo: path %d, score %d + memo score %d = %d < %d%n", path.size(), score, memoBest.getValue0(), bestPathScore, bestScore);
                                 }
                                 bestScore = bestPathScore;
@@ -350,21 +599,21 @@ public class Day17 extends Day {
                 final int currRow = current.row;
                 final int firstCol = path.getFirst().col; // for staying below diagonal
                 final int firstRow = path.getFirst().row;
-                final int diagonalSum = firstCol + firstRow - MIN_STEPS; // -MIN_STEPS is needed to solve the puzzle, it allows path to go MIN_STEPS diagonal above currently memoized one, it won't work for long looping/winding paths
+                final int diagonalSum = firstCol + firstRow - runMinimum; // -MIN_STEPS is needed to solve the puzzle, it allows path to go MIN_STEPS diagonal above currently memoized one, it won't work for long looping/winding paths
                 List<CityGrid.Position> connections = new ArrayList<>(4);
-                if (stepsCols == 0 && stepsRows == 0 || stepsCols >= MIN_STEPS || stepsRows >= 1) {
-                    if (currCol > 0 && !pathMarkers.get(currCol - 1, currRow) && stepsRows < MAX_STEPS && diagonalSum <= currCol - 1 + currRow) {
+                if (stepsCols == 0 && stepsRows == 0 || stepsCols >= runMinimum || stepsRows >= 1) {
+                    if (currCol > 0 && !pathMarkers.get(currCol - 1, currRow) && stepsRows < runMaximum && diagonalSum <= currCol - 1 + currRow) {
                         connections.add(cityGrid.getPosition(currCol - 1, currRow));
                     }
-                    if (currCol < cityGrid.getWidth() - 1 && !pathMarkers.get(currCol + 1, currRow) && stepsRows < MAX_STEPS && diagonalSum <= currCol + 1 + currRow) {
+                    if (currCol < cityGrid.getWidth() - 1 && !pathMarkers.get(currCol + 1, currRow) && stepsRows < runMaximum && diagonalSum <= currCol + 1 + currRow) {
                         connections.add(cityGrid.getPosition(currCol + 1, currRow));
                     }
                 }
-                if (stepsCols == 0 && stepsRows == 0 || stepsRows >= MIN_STEPS || stepsCols >= 1) {
-                    if (currRow > 0 && !pathMarkers.get(currCol, currRow - 1) && stepsCols < MAX_STEPS && diagonalSum <= currCol + currRow - 1) {
+                if (stepsCols == 0 && stepsRows == 0 || stepsRows >= runMinimum || stepsCols >= 1) {
+                    if (currRow > 0 && !pathMarkers.get(currCol, currRow - 1) && stepsCols < runMaximum && diagonalSum <= currCol + currRow - 1) {
                         connections.add(cityGrid.getPosition(currCol, currRow - 1));
                     }
-                    if (currRow < cityGrid.getHeight() - 1 && !pathMarkers.get(currCol, currRow + 1) && stepsCols < MAX_STEPS && diagonalSum <= currCol + currRow + 1) {
+                    if (currRow < cityGrid.getHeight() - 1 && !pathMarkers.get(currCol, currRow + 1) && stepsCols < runMaximum && diagonalSum <= currCol + currRow + 1) {
                         connections.add(cityGrid.getPosition(currCol, currRow + 1));
                     }
                 }
@@ -395,8 +644,8 @@ public class Day17 extends Day {
                             nextDir = currRow < connection.row ? Direction.DOWN : Direction.UP;
                         }
                         if (connection.equals(target)) {
-                            if ((nextStepsCols == 0 && nextStepsRows >= MIN_STEPS) ||
-                                    (nextStepsRows == 0 && nextStepsCols >= MIN_STEPS)) {
+                            if ((nextStepsCols == 0 && nextStepsRows >= runMinimum) ||
+                                    (nextStepsRows == 0 && nextStepsCols >= runMinimum)) {
                                 bestScore = nextScore;
                                 if (onPathFound != null) {
                                     onPathFound.accept(path, nextScore);
@@ -434,8 +683,9 @@ public class Day17 extends Day {
                 pathMarkers.set(col, row, state);
             }
         }
-        
-        public long solve() {
+
+        @Override
+        protected long solve() {
             bestPathsForConstraintAndNode = new HashMap<>();
             List<CityGrid.Position> winnerPath = new LinkedList<>();
             AtomicInteger counter = new AtomicInteger(0);
@@ -448,9 +698,9 @@ public class Day17 extends Day {
                     winnerPath.addAll(path);
                     counter.incrementAndGet();
                 }
-                if (true || path == winnerPath) {
-                    System.out.printf("#%d: %d %s%n", counter.get(), score, String.join(",", path.stream().map(CityGrid.Position::toString).toList()));
-                    System.out.printf("path hash %d%n", Arrays.hashCode(path.toArray(new CityGrid.Position[0])));
+                if (path == winnerPath) {
+                    // System.out.printf("#%d: %d %s%n", counter.get(), score, String.join(",", path.stream().map(CityGrid.Position::toString).toList()));
+                    // System.out.printf("path hash %d%n", Arrays.hashCode(path.toArray(new CityGrid.Position[0])));
                     // debugShowPath("path before reconstruction:", winnerPath);
                     if (winnerPath.getLast() != target) {
                         // reconstruct path finish from memo, check score, check memo best scores
@@ -468,7 +718,7 @@ public class Day17 extends Day {
                                 if (lastDir == Direction.UNKNOWN) {
                                     throw new IllegalStateException();
                                 }
-                                int memoKey = bestPathsForConstraintAndNodeMemoKey(lastDir, Math.max(lastStepsCols, lastStepsRows), current.getId());
+                                int memoKey = bestPathsForConstraintAndNodeMemoKey(lastDir, Math.max(lastStepsCols, lastStepsRows), (int)current.getId());
                                 Pair<Integer, CityGrid.Position> memoBest = bestPathsForConstraintAndNode.get(memoKey);
                                 if (memoBest == null) {
                                     throw new IllegalStateException();
@@ -496,7 +746,11 @@ public class Day17 extends Day {
                             }
                             current = next;
                         } while (current != target);
-                        debugShowPath("path reconstructed:", winnerPath);
+                        if (false) {
+                            System.out.printf("#%d: %d %s%n", counter.get(), score, String.join(",", winnerPath.stream().map(CityGrid.Position::toString).toList()));
+                            System.out.printf("path hash %d%n", Arrays.hashCode(winnerPath.toArray(new CityGrid.Position[0])));
+                            debugShowPath("path reconstructed:", winnerPath);
+                        }
                         if (score != scoreCheck) {
                             throw new IllegalStateException();
                         }
@@ -510,8 +764,8 @@ public class Day17 extends Day {
             memoAll();
 
             pathfinder.findPath(0, 0, 0, Direction.UNKNOWN);
-            pathfinder.memoStatsReport();
-            System.out.print("winner ");
+            // pathfinder.memoStatsReport();
+            // System.out.print("winner ");
             onPathFound.accept(winnerPath, pathfinder.getBestScore());
             long result = pathfinder.getBestScore();
             return result;
@@ -533,32 +787,127 @@ public class Day17 extends Day {
     }
 
     public static class Day17Test {
-        @Test
-        void solvePart1_small() {
-            var day = new Day17("_sample");
-            day.parsePart1();
-            assertEquals(102L, day.solvePart1());
-        }
+        @Nested
+        public class Day17Test_AoCInputs {
+            @Nested
+            class Day17Test_AoCInputs_JKK {
+                @Test
+                void solvePart1_small() {
+                    solvePart1(SolverType.JKK_BOTTOMUP, 102L, "_sample");
+                }
+                @Test
+                void solvePart1_main() {
+                    solvePart1(SolverType.JKK_BOTTOMUP, 851L, "");
+                }
+                @Test
+                void solvePart2_small() {
+                    solvePart2(SolverType.JKK_BOTTOMUP, 94L, "_sample");
+                }
+                @Test
+                void solvePart2_main() {
+                    solvePart2(SolverType.JKK_BOTTOMUP, 982L, "");
+                }
+            }
 
-        @Test
-        void solvePart1_main() {
-            var day = new Day17("");
-            day.parsePart1();
-            assertEquals(851L, day.solvePart1());
+            @Nested
+            class Day17Test_AoCInputs_AStar {
+                @Test
+                void solvePart1_small() {
+                    solvePart1(SolverType.ASTAR, 102L, "_sample");
+                }
+                @Test
+                void solvePart1_main() {
+                    solvePart1(SolverType.ASTAR, 851L, "");
+                }
+                @Test
+                void solvePart2_small() {
+                    solvePart2(SolverType.ASTAR, 94L, "_sample");
+                }
+                @Test
+                void solvePart2_main() {
+                    solvePart2(SolverType.ASTAR, 982L, "");
+                }
+            }
         }
-
-        @Test
-        void solvePart2_small() {
-            var day = new Day17("_sample");
-            day.parsePart2();
-            assertEquals(94L, day.solvePart2());
+        @Nested
+        public class Day17Test_Cases {
+            @Nested
+            class Day17Test_Cases_sample_subset_10x10 {
+                @Test void test_sample_subset_10x10_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 94L, "_sample_subset_10x10"); }
+                @Test void test_sample_subset_10x10_ASTAR() { solvePart1(SolverType.ASTAR, 94L, "_sample_subset_10x10"); }
+            }
+            @Nested
+            class Day17Test_Cases_test_2way_12x12 {
+                @Test void test_test_2way_12x12_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 94L, "_test_2way_12x12"); }
+                @Test void test_test_2way_12x12_ASTAR() { solvePart1(SolverType.ASTAR, 94L, "_test_2way_12x12"); }
+            }
+            @Nested
+            class Day17Test_Cases_test_directionmatters {
+                @Test void test_test_directionmatters_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 9L, "_test_directionmatters"); }
+                @Test void test_test_directionmatters_ASTAR() { solvePart1(SolverType.ASTAR, 9L, "_test_directionmatters"); }
+            }
+            @Nested
+            class Day17Test_Cases_test_blackhole_loopy_7x7_harder {
+                @Test void test_test_blackhole_loopy_7x7_harder_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 28L, "_test_blackhole_loopy_7x7_harder"); }
+                @Test void test_test_blackhole_loopy_7x7_harder_ASTAR() { solvePart1(SolverType.ASTAR, 28L, "_test_blackhole_loopy_7x7_harder"); }
+            }
+            @Nested
+            class Day17Test_Cases_test_blackhole_loopy_8x8_easier {
+                @Test void test_test_blackhole_loopy_8x8_easier_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 34L, "_test_blackhole_loopy_8x8_easier"); }
+                @Test void test_test_blackhole_loopy_8x8_easier_ASTAR() { solvePart1(SolverType.ASTAR, 34L, "_test_blackhole_loopy_8x8_easier"); }
+            }
+            @Nested
+            class Day17Test_Cases_test_meandering_9x9 {
+                @Test void test_test_meandering_9x9_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 54L, "_test_meandering_9x9"); }
+                @Test void test_test_meandering_9x9_ASTAR() { solvePart1(SolverType.ASTAR, 54L, "_test_meandering_9x9"); }
+            }
+            @Nested
+            class Day17Test_Cases_test_meandering_loopy_30x30 {
+                @Test void test_test_meandering_loopy_30x30_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 190L, "_test_meandering_loopy_30x30"); }
+                @Test void test_test_meandering_loopy_30x30_ASTAR() { solvePart1(SolverType.ASTAR, 190L, "_test_meandering_loopy_30x30"); }
+            }
+            @Nested
+            class Day17Test_Cases_test_meandering_loopy_24x24_1 {
+                @Test void test_test_meandering_loopy_24x24_1_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 0L, "_test_meandering_loopy_24x24_1"); }
+                @Test void test_test_meandering_loopy_24x24_1_ASTAR() { solvePart1(SolverType.ASTAR, 0L, "_test_meandering_loopy_24x24_1"); }
+            }
+            @Nested
+            class Day17Test_Cases_test_meandering_loopy_24x24_2 {
+                @Test void test_test_meandering_loopy_24x24_2_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 116L, "_test_meandering_loopy_24x24_2"); }
+                @Test void test_test_meandering_loopy_24x24_2_ASTAR() { solvePart1(SolverType.ASTAR, 116L, "_test_meandering_loopy_24x24_2"); }
+            }
         }
-
+        static void solvePart1(SolverType solverType, long expectedResult, String inputSuffix) {
+            solve(solverType, expectedResult, inputSuffix, 1, 3);
+        }
+        static void solvePart2(SolverType solverType, long expectedResult, String inputSuffix) {
+            solve(solverType, expectedResult, inputSuffix, 4, 10);
+        }
+        static void solve(SolverType solverType, long expectedResult, String inputSuffix, int runMinimum, int runMaximum) {
+            var day = new Day17(inputSuffix);
+            day.parse();
+            assertEquals(expectedResult, day.solve(solverType, runMinimum, runMaximum));
+        }
+    }
+    public static class Day17Test_SolverBenchmark {
         @Test
-        void solvePart2_main() {
-            var day = new Day17("");
-            day.parsePart2();
-            assertEquals(982L, day.solvePart2());
+        void test_main() {
+            bench(new SolverType[] { SolverType.JKK_BOTTOMUP, SolverType.ASTAR }, 851L, "", 1, 3);
+            bench(new SolverType[] { SolverType.JKK_BOTTOMUP, SolverType.ASTAR }, 982L, "", 4, 10);
+        }
+        void bench(SolverType[] solverTypes, long expectedResult, String inputSuffix, int runMinimum, int runMaximum) {
+            Day17 day17 = new Day17(inputSuffix);
+            day17.parse();
+            System.out.printf("### benchmark of \"%s\" with run min %d max %d%n", inputSuffix, runMinimum, runMaximum);
+            for (SolverType solverType : solverTypes) {
+                Instant start = Instant.now();
+                test(solverType, expectedResult, day17, runMinimum, runMaximum);
+                Instant finish = Instant.now();
+                System.out.printf("### %-20s elapsed for solver \"%s\"%n", Duration.between(start, finish).toString(), solverType);
+            }
+        }
+        void test(SolverType solverType, long expectedResult, Day17 day17, int runMinimum, int runMaximum) {
+            assertEquals(expectedResult, day17.solve(solverType, runMinimum, runMaximum));
         }
     }
 }

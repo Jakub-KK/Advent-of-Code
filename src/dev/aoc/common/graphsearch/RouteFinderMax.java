@@ -15,11 +15,11 @@ public class RouteFinderMax<T extends GraphNode> implements RouteFinder<T> {
         this.targetScorer = targetScorer;
     }
 
-    private record State<T extends GraphNode>(RouteNode<T> node, List<RouteNode<T>> connections) {}
+    private record State<T extends GraphNode>(RouteNodeEstimated<T> node, List<RouteNodeEstimated<T>> connections) {}
 
-    private State<T> createState(RouteNode<T> node, Map<T, RouteNode<T>> allNodes, T to) {
-        List<RouteNode<T>> connections = graph.getEdges(node.getCurrent()).stream().map(connection -> {
-            RouteNode<T> nextNode = allNodes.computeIfAbsent(connection, key -> new RouteNode<>(connection));
+    private State<T> createState(RouteNodeEstimated<T> node, Map<T, RouteNodeEstimated<T>> allNodes, T to) {
+        List<RouteNodeEstimated<T>> connections = graph.getEdges(node.getCurrent()).stream().map(connection -> {
+            RouteNodeEstimated<T> nextNode = allNodes.computeIfAbsent(connection, key -> new RouteNodeEstimated<>(connection));
             if ((node.getPrevious() != null && nextNode.equals(node.getPrevious())) || nextNode.getPrevious() != null) {
                 return null; // skip going back and ignore visited connections
             }
@@ -29,33 +29,36 @@ public class RouteFinderMax<T extends GraphNode> implements RouteFinder<T> {
             // nextNode.setEstimatedScore(newScore + targetScorer.computeCost(connection, to));
             return nextNode;
         }).filter(Objects::nonNull).toList();
-        List<RouteNode<T>> connectionsSet = new ArrayList<>(connections);
-        connectionsSet.sort(RouteNode::compareTo);
+        List<RouteNodeEstimated<T>> connectionsSet = new ArrayList<>(connections);
+        connectionsSet.sort(RouteNodeEstimated::compareTo);
         return new State<>(node, connectionsSet);
     }
 
-    protected void foundRoute(List<T> route, long score) {
-    }
+    protected void foundRoute(List<T> route, long score) {}
 
-    public Pair<List<T>, Long> findRoute(T from, T to) {
-        Map<T, RouteNode<T>> allNodes = new HashMap<>();
+    public Pair<List<T>, Long> findRoute(T start, T target) {
+        return findRoute(List.of(start), target);
+    }
+    public Pair<List<T>, Long> findRoute(Iterable<T> starts, T target) {
+        Map<T, RouteNodeEstimated<T>> allNodes = new HashMap<>();
         List<State<T>> state = new LinkedList<>();
 
-        RouteNode<T> start = new RouteNode<>(from, null, 0, targetScorer.computeCost(from, to));
-        allNodes.put(from, start);
-        state.add(createState(start, allNodes, to));
+        for (T from : starts) {
+            RouteNodeEstimated<T> start = new RouteNodeEstimated<>(from, null, 0, targetScorer.computeCost(from, target));
+            allNodes.put(from, start);
+            state.add(createState(start, allNodes, target));
+        }
 
         List<T> maxRoute = null;
         long maxScore = Long.MIN_VALUE;
 
-        // [1,0], [3,5], [5,13], [13,19], [13,13], [11,3], [21,11], [19,19], [21,22]
         while (!state.isEmpty()) {
             State<T> last = state.getLast();
-            RouteNode<T> current = last.node;
-            if (current.getCurrent().equals(to)) {
+            RouteNodeEstimated<T> current = last.node;
+            if (current.getCurrent().equals(target)) {
                 // found the route
                 List<T> route = new ArrayList<>();
-                RouteNode<T> routeNode = current;
+                RouteNodeEstimated<T> routeNode = current;
                 do {
                     route.addFirst(routeNode.getCurrent());
                     routeNode = routeNode.getPrevious();
@@ -73,12 +76,12 @@ public class RouteFinderMax<T extends GraphNode> implements RouteFinder<T> {
                 state.removeLast();
                 continue;
             }
-            RouteNode<T> nextNode = last.connections.removeFirst();
+            RouteNodeEstimated<T> nextNode = last.connections.removeFirst();
             long newScore = current.getRouteScore() + nextNodeScorer.computeCost(current.getCurrent(), nextNode.getCurrent());
             nextNode.setPrevious(current);
             nextNode.setRouteScore(newScore);
-            nextNode.setEstimatedScore(newScore + targetScorer.computeCost(current.getCurrent(), to));
-            State<T> nextState = createState(nextNode, allNodes, to);
+            nextNode.setEstimatedScore(newScore + targetScorer.computeCost(current.getCurrent(), target));
+            State<T> nextState = createState(nextNode, allNodes, target);
             state.add(nextState);
         }
         if (maxRoute == null) {
