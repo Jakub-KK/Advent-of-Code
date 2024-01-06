@@ -71,7 +71,8 @@ public class Day18 extends Day {
         long area = getAreaFromPointsOfSimplePolygon();
         // formula discovery: https://old.reddit.com/r/adventofcode/comments/18l8mao/2023_day_18_intuition_for_why_spoiler_alone/kdwsdmp/
         // actual formula source: Pick's Theorem, explanation https://old.reddit.com/r/adventofcode/comments/18l8mao/2023_day_18_intuition_for_why_spoiler_alone/
-        long result = sumEdgeLength + area - (sumEdgeLength / 2 - 1);
+        // long result = sumEdgeLength + area - (sumEdgeLength / 2 - 1); // guessed from sample
+        long result = area + sumEdgeLength / 2 + 1; // actual Pick's Theorem
         return result;
     }
 
@@ -146,7 +147,7 @@ public class Day18 extends Day {
     public Object solvePart2() {
         convertDigPlanToPoints();
         long area = getAreaFromPointsOfSimplePolygon();
-        long result = sumEdgeLength + area - (sumEdgeLength / 2 - 1);
+        long result = area + sumEdgeLength / 2 + 1; // actual Pick's Theorem
         return result;
     }
 
