@@ -166,7 +166,7 @@ public class Day16 extends Day {
 
     public static class Day16Test {
         @Test
-        void solvePart1_small() {
+        void solvePart1_sample() {
             var day = new Day16("_sample");
             day.parsePart1();
             assertEquals(46L, day.solvePart1());
@@ -180,7 +180,7 @@ public class Day16 extends Day {
         }
 
         @Test
-        void solvePart2_small() {
+        void solvePart2_sample() {
             var day = new Day16("_sample");
             day.parsePart2();
             assertEquals(51L, day.solvePart2());

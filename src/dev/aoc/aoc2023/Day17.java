@@ -835,7 +835,7 @@ public class Day17 extends Day {
             @Nested
             class Day17Test_AoCInputs_JKK {
                 @Test
-                void solvePart1_small() {
+                void solvePart1_sample() {
                     solvePart1(SolverType.JKK_BOTTOMUP, 102L, "_sample");
                 }
                 @Test
@@ -843,7 +843,7 @@ public class Day17 extends Day {
                     solvePart1(SolverType.JKK_BOTTOMUP, 851L, "");
                 }
                 @Test
-                void solvePart2_small() {
+                void solvePart2_sample() {
                     solvePart2(SolverType.JKK_BOTTOMUP, 94L, "_sample");
                 }
                 @Test
@@ -855,7 +855,7 @@ public class Day17 extends Day {
             @Nested
             class Day17Test_AoCInputs_AStar {
                 @Test
-                void solvePart1_small() {
+                void solvePart1_sample() {
                     solvePart1(SolverType.ASTAR, 102L, "_sample");
                 }
                 @Test
@@ -863,7 +863,7 @@ public class Day17 extends Day {
                     solvePart1(SolverType.ASTAR, 851L, "");
                 }
                 @Test
-                void solvePart2_small() {
+                void solvePart2_sample() {
                     solvePart2(SolverType.ASTAR, 94L, "_sample");
                 }
                 @Test

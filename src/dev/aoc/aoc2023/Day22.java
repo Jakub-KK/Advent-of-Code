@@ -391,7 +391,7 @@ public class Day22 extends Day {
 
     public static class Day22Test {
         @Test
-        void solvePart1_small() {
+        void solvePart1_sample() {
             var day = new Day22("_sample");
             day.parsePart1();
             assertEquals(5L, day.solvePart1());
@@ -405,7 +405,7 @@ public class Day22 extends Day {
         }
 
         @Test
-        void solvePart2_small() {
+        void solvePart2_sample() {
             var day = new Day22("_sample");
             day.parsePart2();
             assertEquals(7L, day.solvePart2());

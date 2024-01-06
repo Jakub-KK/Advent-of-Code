@@ -341,7 +341,7 @@ public class Day19 extends Day {
 
     public static class Day19Test {
         @Test
-        void solvePart1_small() {
+        void solvePart1_sample() {
             var day = new Day19("_sample");
             day.parsePart1();
             assertEquals(19114L, day.solvePart1());
@@ -355,7 +355,7 @@ public class Day19 extends Day {
         }
 
         @Test
-        void solvePart2_small() {
+        void solvePart2_sample() {
             var day = new Day19("_sample");
             day.parsePart2();
             assertEquals(167409079868000L, day.solvePart2());

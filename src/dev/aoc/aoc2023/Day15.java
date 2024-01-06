@@ -214,7 +214,7 @@ public class Day15 extends Day {
         }
 
         @Test
-        void solvePart2_AL_small() {
+        void solvePart2_AL_sample() {
             var day = new Day15("_sample");
             day.parsePart2();
             Object result = day.solvePart2_AL();

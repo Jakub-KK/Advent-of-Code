@@ -1535,7 +1535,7 @@ public class Day21 extends Day {
         }
 
         @Test
-        void solvePart1_small() {
+        void solvePart1_sample() {
             var day = new Day21("_sample_1x1maps");
             day.parsePart1();
             assertEquals(16L, day.solvePart1());
@@ -1549,7 +1549,7 @@ public class Day21 extends Day {
         }
 
         @Test
-        void solvePart2_small() {
+        void solvePart2_sample() {
             var day = new Day21("_sample_1x1maps");
             day.parsePart2();
             assertEquals(16733044L, day.solvePart2());
