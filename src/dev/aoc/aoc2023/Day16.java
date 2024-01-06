@@ -15,23 +15,23 @@ public class Day16 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day16("_sample")); // _sample, _loop, _large1
+        Day.run(() -> new Day16("_sample")); // _sample, _loop_1, _loop_2, _large1
     }
 
-    private Grid<Character> mirrorGrid; // '.' empty, '|' and '-' splitter, '/' and '\' mirrors
+    private Grid<Character> objectGrid; // '.' empty, '|' and '-' splitter, '/' and '\' mirrors
 
     public record BeamStart(int posX, int posY, Grid.Direction dir) {}
 
-    /** Light beam path, '|' and '-' light direction, '+' light crossing, '*' mirrors */
-    private static class LightGrid extends Grid<Character> {
-        private final Grid<Character> mirrorGrid;
-        private final Set<Character> isMirror = Set.of('/', '\\');
-        private final Set<Character> canBeamVertical = Set.of('.', '*', '-'); // set of chars that mark position as possible to travel vertically
-        private final Set<Character> canBeamHorizontal = Set.of('.', '*', '|'); // set of chars that mark position as possible to travel horizontally
+    /** Light beam path, '|' and '-' light direction, '+' light crossing, '*' mirrors (hit) */
+    private static abstract class LightGrid extends Grid<Character> {
+        protected final Grid<Character> objectGrid;
+        protected final Set<Character> isMirror = Set.of('/', '\\');
+        protected final Set<Character> canBeamVertical = Set.of('.', '*', '-'); // set of chars that mark position as possible to travel vertically
+        protected final Set<Character> canBeamHorizontal = Set.of('.', '*', '|'); // set of chars that mark position as possible to travel horizontally
 
-        public LightGrid(Grid<Character> mirrorGrid) {
-            super(mirrorGrid.getWidth(), mirrorGrid.getHeight(), '.', mirrorGrid.getElementDelimiter());
-            this.mirrorGrid = mirrorGrid;
+        public LightGrid(Grid<Character> objectGrid) {
+            super(objectGrid.getWidth(), objectGrid.getHeight(), '.', objectGrid.getElementDelimiter());
+            this.objectGrid = objectGrid;
         }
 
         // int maxLightHeadsCount = 0;
@@ -50,47 +50,34 @@ public class Day16 extends Day {
                 //     System.out.printf("max light heads %d%n", maxLightHeadsCount);
                 // }
                 BeamStart head = lightHeads.removeFirst();
-                // propagate: find a position where the light beam hits a symbol or exits grid
+                // propagate: find a position where the light beam hits an object or exits grid
                 int posX = head.posX, posY = head.posY;
                 int dX = head.dir.dCol, dY = head.dir.dRow;
-                while (mirrorGrid.hasColumn(posX) && mirrorGrid.hasRow(posY) && (
-                        (mirrorGrid.is(posX, posY,'.') ||
-                                (dX == 0 && mirrorGrid.is(posX, posY,'|')) || // pass through splitter parallel to light beam
-                                (dY == 0 && mirrorGrid.is(posX, posY,'-'))
+                while (objectGrid.hasColumn(posX) && objectGrid.hasRow(posY) && (
+                        (objectGrid.is(posX, posY,'.') ||
+                                (dX == 0 && objectGrid.is(posX, posY,'|')) || // pass through splitter parallel to light beam
+                                (dY == 0 && objectGrid.is(posX, posY,'-'))
                         )
                 )) {
                     // use light grid to remember beam positions and direction
-                    markBeamPath(posX, posY, dX != 0);
+                    markPath(posX, posY, dX != 0);
                     posX += dX;
                     posY += dY;
                 }
                 // if beam ended outside of grid, forget about it
-                if (!mirrorGrid.hasPos(posX, posY)) {
+                if (!objectGrid.hasPos(posX, posY)) {
+                    escaped(posX, posY, dX, dY);
                     continue;
                 }
-                // remember...
-                markBeamPath(posX, posY, dX != 0);
-                // beam hit an object which splits or mirrors, spawn new beams depending on object and beam direction
-                // do not reenter positions that were visited before if the same beam direction (taking crossing into account)
-                // always reenter mirrors (entering from the other side special case)
-                char objectSymbol = mirrorGrid.get(posX, posY);
-                if ((objectSymbol == '|' || (objectSymbol == '/' && dX > 0) || (objectSymbol == '\\' && dX < 0)) && posY > 0 && this.isInSet(posX, posY - 1, canBeamVertical)) {
-                    lightHeads.add(new BeamStart(posX, posY - 1, Grid.Direction.UP)); // add light beam traveling up
-                }
-                if ((objectSymbol == '|' || (objectSymbol == '/' && dX < 0) || (objectSymbol == '\\' && dX > 0)) && posY < mirrorGrid.getHeight() - 1 && this.isInSet(posX, posY + 1, canBeamVertical)) {
-                    lightHeads.add(new BeamStart(posX, posY + 1, Grid.Direction.DOWN)); // add light beam traveling down
-                }
-                if ((objectSymbol == '-' || (objectSymbol == '/' && dY > 0) || (objectSymbol == '\\' && dY < 0)) && posX > 0 && this.isInSet(posX - 1, posY, canBeamHorizontal)) {
-                    lightHeads.add(new BeamStart(posX - 1, posY, Grid.Direction.LEFT)); // add light beam traveling left
-                }
-                if ((objectSymbol == '-' || (objectSymbol == '/' && dY < 0) || (objectSymbol == '\\' && dY > 0)) && posX < mirrorGrid.getWidth() - 1 && this.isInSet(posX + 1, posY, canBeamHorizontal)) {
-                    lightHeads.add(new BeamStart(posX + 1, posY, Grid.Direction.RIGHT)); // add light beam traveling right
-                }
+                // consider collisions of beam with objects, spawn new beams
+                propagate(posX, posY, dX, dY, lightHeads);
+                // remember beam position and direction
+                markPath(posX, posY, dX != 0);
             }
             return this.count(c -> c != '.');
         }
-        private void markBeamPath(int posX, int posY, boolean isBeamHorizontal) {
-            if (mirrorGrid.isInSet(posX, posY, isMirror)) {
+        private void markPath(int posX, int posY, boolean isBeamHorizontal) {
+            if (objectGrid.isInSet(posX, posY, isMirror)) {
                 this.set(posX, posY, '*'); // special mark for mirrors to allow reentry (from the other side)
             } else if (isBeamHorizontal ? this.is(posX, posY, '|') : this.is(posX, posY, '-')) {
                 this.set(posX, posY, '+'); // mark light crossings
@@ -98,7 +85,66 @@ public class Day16 extends Day {
                 this.set(posX, posY, isBeamHorizontal ? '-' : '|');
             }
         }
+        protected abstract void propagate(int posX, int posY, int dX, int dY, List<BeamStart> lightHeads);
 
+        /** TODO: when light beam escapes the grid it is possible that when treating every exit point
+         * as entry point (beaming in reverse direction) we cannot attain better score.
+         * See http://clb.confined.space/aoc2023/#day16code
+         * 1. Add calls to "escaped" to "propagate" function (missing right now)
+         * 2. Check the conjecture on test cases, maybe randomly generated object grids */
+        protected void escaped(int posX, int posY, int dX, int dY) {}
+    }
+
+    /** Sophisticated light propagation, general solution */
+    private static class LightGridPropagate extends LightGrid {
+        public LightGridPropagate(Grid<Character> objectGrid) {
+            super(objectGrid);
+        }
+        protected void propagate(int posX, int posY, int dX, int dY, List<BeamStart> lightHeads) {
+            // beam hit an object which splits or mirrors, spawn new beams depending on object and beam direction
+            // do not reenter positions that were visited before if the same beam direction (taking crossing into account)
+            // always reenter mirrors (entering from the other side special case)
+            char objectSymbol = objectGrid.get(posX, posY);
+            if ((objectSymbol == '|' || (objectSymbol == '/' && dX > 0) || (objectSymbol == '\\' && dX < 0)) && posY > 0 && this.isInSet(posX, posY - 1, canBeamVertical)) {
+                lightHeads.add(new BeamStart(posX, posY - 1, Grid.Direction.UP)); // add light beam traveling up
+            }
+            if ((objectSymbol == '|' || (objectSymbol == '/' && dX < 0) || (objectSymbol == '\\' && dX > 0)) && posY < objectGrid.getHeight() - 1 && this.isInSet(posX, posY + 1, canBeamVertical)) {
+                lightHeads.add(new BeamStart(posX, posY + 1, Grid.Direction.DOWN)); // add light beam traveling down
+            }
+            if ((objectSymbol == '-' || (objectSymbol == '/' && dY > 0) || (objectSymbol == '\\' && dY < 0)) && posX > 0 && this.isInSet(posX - 1, posY, canBeamHorizontal)) {
+                lightHeads.add(new BeamStart(posX - 1, posY, Grid.Direction.LEFT)); // add light beam traveling left
+            }
+            if ((objectSymbol == '-' || (objectSymbol == '/' && dY < 0) || (objectSymbol == '\\' && dY > 0)) && posX < objectGrid.getWidth() - 1 && this.isInSet(posX + 1, posY, canBeamHorizontal)) {
+                lightHeads.add(new BeamStart(posX + 1, posY, Grid.Direction.RIGHT)); // add light beam traveling right
+            }
+        }
+    }
+
+    /** Simpler light propagation, it needs only one bit of information to not use splitter again after first usage.
+     * source: http://clb.confined.space/aoc2023/#day16code
+     * WARNING: non-general solution, it fails to evade mirror loops (see _loop_1 test case), curiously sufficient for solving actual puzzle solution */
+    private static class LightGridPropagateNonGeneralButSufficient extends LightGrid {
+        public LightGridPropagateNonGeneralButSufficient(Grid<Character> objectGrid) {
+            super(objectGrid);
+        }
+        protected void propagate(int posX, int posY, int dX, int dY, List<BeamStart> lightHeads) {
+            // beam hit an object which splits or mirrors, spawn new beams depending on object and beam direction
+            // do not reenter positions that were visited before if the same beam direction (taking crossing into account)
+            // always reenter mirrors (entering from the other side special case)
+            char objectSymbol = objectGrid.get(posX, posY);
+            if (posY > 0 && ((objectSymbol == '|' && this.is(posX, posY, '.')) || (objectSymbol == '/' && dX > 0) || (objectSymbol == '\\' && dX < 0))) {
+                lightHeads.add(new BeamStart(posX, posY - 1, Grid.Direction.UP)); // add light beam traveling up
+            }
+            if (posY < objectGrid.getHeight() - 1 && ((objectSymbol == '|' && this.is(posX, posY, '.')) || (objectSymbol == '/' && dX < 0) || (objectSymbol == '\\' && dX > 0))) {
+                lightHeads.add(new BeamStart(posX, posY + 1, Grid.Direction.DOWN)); // add light beam traveling down
+            }
+            if (posX > 0 && ((objectSymbol == '-' && this.is(posX, posY, '.')) || (objectSymbol == '/' && dY > 0) || (objectSymbol == '\\' && dY < 0))) {
+                lightHeads.add(new BeamStart(posX - 1, posY, Grid.Direction.LEFT)); // add light beam traveling left
+            }
+            if (posX < objectGrid.getWidth() - 1 && ((objectSymbol == '-' && this.is(posX, posY, '.')) || (objectSymbol == '/' && dY < 0) || (objectSymbol == '\\' && dY > 0))) {
+                lightHeads.add(new BeamStart(posX + 1, posY, Grid.Direction.RIGHT)); // add light beam traveling right
+            }
+        }
     }
 
     @SolutionParser(partNumber = 1)
@@ -109,8 +155,9 @@ public class Day16 extends Day {
 
     @SolutionSolver(partNumber = 1)
     public Object solvePart1() {
-        LightGrid lightGrid = new LightGrid(mirrorGrid);
+        LightGrid lightGrid = new LightGridPropagate(objectGrid);
         long result = lightGrid.countEnergized(new BeamStart(0, 0, Grid.Direction.RIGHT));
+        // long result = lightGrid.countEnergized(new BeamStart(9, 2, Grid.Direction.LEFT));
         // System.out.println(lightGrid);
         return result;
     }
@@ -122,26 +169,26 @@ public class Day16 extends Day {
 
     @SolutionSolver(partNumber = 2)
     public Object solvePart2() {
-        LightGrid lightGrid = new LightGrid(mirrorGrid);
+        LightGrid lightGrid = new LightGridPropagate(objectGrid);
         long[] results = new long[4];
-        results[0] = IntStream.range(0, mirrorGrid.getWidth()).mapToLong(col -> lightGrid.countEnergized(new BeamStart(col, 0, Grid.Direction.DOWN))).max().getAsLong();
-        results[1] = IntStream.range(0, mirrorGrid.getWidth()).mapToLong(col -> lightGrid.countEnergized(new BeamStart(col, mirrorGrid.getHeight() - 1, Grid.Direction.UP))).max().getAsLong();
-        results[2] = IntStream.range(0, mirrorGrid.getHeight()).mapToLong(row -> lightGrid.countEnergized(new BeamStart(0, row, Grid.Direction.RIGHT))).max().getAsLong();
-        results[3] = IntStream.range(0, mirrorGrid.getHeight()).mapToLong(row -> lightGrid.countEnergized(new BeamStart(mirrorGrid.getHeight() - 1, row, Grid.Direction.LEFT))).max().getAsLong();
+        results[0] = IntStream.range(0, objectGrid.getWidth()).mapToLong(col -> lightGrid.countEnergized(new BeamStart(col, 0, Grid.Direction.DOWN))).max().getAsLong();
+        results[1] = IntStream.range(0, objectGrid.getWidth()).mapToLong(col -> lightGrid.countEnergized(new BeamStart(col, objectGrid.getHeight() - 1, Grid.Direction.UP))).max().getAsLong();
+        results[2] = IntStream.range(0, objectGrid.getHeight()).mapToLong(row -> lightGrid.countEnergized(new BeamStart(0, row, Grid.Direction.RIGHT))).max().getAsLong();
+        results[3] = IntStream.range(0, objectGrid.getHeight()).mapToLong(row -> lightGrid.countEnergized(new BeamStart(objectGrid.getHeight() - 1, row, Grid.Direction.LEFT))).max().getAsLong();
         long result = Arrays.stream(results).max().getAsLong();
         return result;
     }
 
     private void parse() {
-        mirrorGrid = new Grid<>(stream().toList(), "", s -> s.charAt(0), Character.class);
-        int countEmpty = mirrorGrid.count(c -> c == '.');
-        int countSplitterVertical = mirrorGrid.count(c -> c == '|');
-        int countSplitterHorizontal = mirrorGrid.count(c -> c == '-');
-        int countMirror1 = mirrorGrid.count(c -> c == '/');
-        int countMirror2 = mirrorGrid.count(c -> c == '\\');
-        int all = mirrorGrid.getWidth() * mirrorGrid.getHeight();
-        System.out.printf("mirror grid %d x %d: %.2f%% empty, %.2f%% mirrors (%.2f%% /, %.2f%% \\), %.2f%% splitters (%.2f%% |, %.2f%% -) %n", mirrorGrid.getWidth(), mirrorGrid.getHeight(), 100.0*countEmpty/all, 100.0*(countMirror1+countMirror2)/all, 100.0*countMirror1/all, 100.0*countMirror2/all, 100.0*(countSplitterHorizontal+countSplitterVertical)/all, 100.0*countSplitterHorizontal/all, 100.0*countSplitterVertical/all);
-        // System.out.println(mirrorGrid);
+        objectGrid = new Grid<>(stream().toList(), "", s -> s.charAt(0), Character.class);
+        int countEmpty = objectGrid.count(c -> c == '.');
+        int countSplitterVertical = objectGrid.count(c -> c == '|');
+        int countSplitterHorizontal = objectGrid.count(c -> c == '-');
+        int countMirror1 = objectGrid.count(c -> c == '/');
+        int countMirror2 = objectGrid.count(c -> c == '\\');
+        int all = objectGrid.getWidth() * objectGrid.getHeight();
+        System.out.printf("mirror grid %d x %d: %.2f%% empty, %.2f%% mirrors (%.2f%% /, %.2f%% \\), %.2f%% splitters (%.2f%% |, %.2f%% -) %n", objectGrid.getWidth(), objectGrid.getHeight(), 100.0*countEmpty/all, 100.0*(countMirror1+countMirror2)/all, 100.0*countMirror1/all, 100.0*countMirror2/all, 100.0*(countSplitterHorizontal+countSplitterVertical)/all, 100.0*countSplitterHorizontal/all, 100.0*countSplitterVertical/all);
+        // System.out.println(objectGrid);
     }
 
     private void createTest(String testSuffix, int side, double probObject) {
