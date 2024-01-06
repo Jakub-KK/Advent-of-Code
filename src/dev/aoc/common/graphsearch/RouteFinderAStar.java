@@ -36,12 +36,15 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
 
         // List<T> minRoute = null;
         // long minScore = Long.MAX_VALUE;
+        // int maxOpenSetCount = openSet.getSize();
+        // int countClosedNodes = 0;
 
         while (!openSet.isEmpty()) {
             // System.out.printf("routing: open %d%n", openSet.size());
             RouteNodeEstimatedPlusHeapRef<T> current = openSet.extractMinimum().getValue();
             current.setHeapEntry(null); // we don't need heap reference no more as this route node is off the open set
             T currentNode = current.getCurrent();
+            // countClosedNodes++;
             if (currentNode.equalsTarget(target)) {
                 // System.out.printf("score %d%n", current.getRouteScore());
                 List<T> route = new ArrayList<>();
@@ -59,7 +62,7 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
                 // }
             }
 
-            graph.getEdges(currentNode).forEach(nextNode -> {
+            for (T nextNode : graph.getEdges(currentNode)) {
                 var next = all.computeIfAbsent(nextNode, key -> new RouteNodeEstimatedPlusHeapRef<>(nextNode));
                 long newScore = current.getRouteScore() + nextNodeScorer.computeCost(currentNode, nextNode);
                 if (newScore < next.getRouteScore()) {
@@ -73,7 +76,11 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
                         openSet.insert(next, next);
                     }
                 }
-            });
+            }
+
+            // if (maxOpenSetCount < openSet.getSize()) {
+            //     maxOpenSetCount = openSet.getSize();
+            // }
         }
 
         throw new IllegalStateException("no route found");
@@ -119,7 +126,7 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
                 // }
             }
 
-            graph.getEdges(currentNode).forEach(nextNode -> {
+            for (T nextNode : graph.getEdges(currentNode)) {
                 var next = all.computeIfAbsent(nextNode, key -> new RouteNodeEstimated<>(nextNode));
                 long newScore = current.getRouteScore() + nextNodeScorer.computeCost(currentNode, nextNode);
                 if (newScore < next.getRouteScore()) {
@@ -136,7 +143,7 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
                     // note: original implementation from source article at baeldung.com just added next node to open set
                     // this is not sufficient for standard java PQ and will lead to errors (likely it sees the same reference as added already and does not reorder)
                 }
-            });
+            }
         }
 
         throw new IllegalStateException("no route found");
