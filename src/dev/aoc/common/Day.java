@@ -11,17 +11,20 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.google.common.io.Files.asCharSource;
 import static java.lang.Integer.parseInt;
 import static java.nio.charset.Charset.defaultCharset;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public abstract class Day {
     private final int aocYear;
@@ -60,10 +63,6 @@ public abstract class Day {
     public static void run(Supplier<Day> dayFactory) {
         Day instance = dayFactory.get(); // we need instance to get class and methods, will be used later
         var dayClass = instance.getClass();
-        Benchmark dayBenchmarkAnnotation = dayClass.getDeclaredAnnotation(Benchmark.class);
-        if (dayBenchmarkAnnotation != null) {
-            System.out.println("TODO benchmarks"); // TODO benchmark support
-        }
         var declaredMethods = dayClass.getDeclaredMethods();
         var parsers = Arrays.stream(declaredMethods).filter(m -> m.isAnnotationPresent(SolutionParser.class)).toList();
         var solvers = Arrays.stream(declaredMethods).filter(m -> m.isAnnotationPresent(SolutionSolver.class)).toList();
@@ -128,6 +127,7 @@ public abstract class Day {
         }
         var partSolversPerName = partSolvers.stream().collect(Collectors.groupingBy(m -> m.getDeclaredAnnotation(SolutionSolver.class).solutionName()));
         var partElementsPerName = new HashMap<String, Pair<Method, Method>>();
+        boolean defaultParserUsed = false;
         for (String solverName : partSolversPerName.keySet()) {
             // get singular solver for current name
             var solversOfName = partSolversPerName.get(solverName);
@@ -146,6 +146,7 @@ public abstract class Day {
                     throw new IllegalArgumentException("part %d too many default parsers (%d) for name %s".formatted(partNumber, defaultParsers.size(), solverName));
                 } else {
                     parser = defaultParsers.getFirst();
+                    defaultParserUsed = true;
                 }
             } else if (parsersOfName.size() > 1) {
                 throw new IllegalArgumentException("part %d parsers name collision for name %s".formatted(partNumber, solverName));
@@ -155,7 +156,8 @@ public abstract class Day {
             }
             partElementsPerName.put(solverName, new Pair<>(parser, solver));
         }
-        if (!partParsersPerName.isEmpty()) {
+        final boolean finalDefaultParserUsed = defaultParserUsed;
+        if (partParsersPerName.keySet().stream().anyMatch(s -> !finalDefaultParserUsed || !s.equals(DEFAULT_NAME))) {
             System.out.printf("*** part %d redundant parsers found: %s%n", partNumber, String.join(", ", partParsersPerName.keySet().stream().toList()));
         }
         return partElementsPerName;
@@ -184,6 +186,39 @@ public abstract class Day {
             System.out.printf("### Part %d, solver \"%s\": solved [elapsed: %s]: %n%s%n%n", partNumber, solverName, Duration.between(solvingStart, solvingFinish).toString(), partResult);
         } else {
             System.out.printf("### Part %d, solver \"%s\": solver UNFINISHED%n%n", partNumber, solverName);
+        }
+    }
+
+    public static <T, U> void benchmark(int cycles, Object expectedResult, String inputSuffix, List<U> solverTypes, Function<U, T> dayFactory, BiFunction<T, U, Object> solveMethod, String paramsDescription) {
+        final int percentDiscardWorstOutliers = 20;
+        final int cycleDiscardWorstOutliers = cycles > 3 ? Math.max(1, cycles * percentDiscardWorstOutliers / 100) : 0;
+        System.out.printf("### benchmark of \"%s\" (%d cycles, %d worst discarded) with params \"%s\"%n", inputSuffix, cycles, cycleDiscardWorstOutliers, paramsDescription);
+        List<Duration> measurements = new ArrayList<>(cycles);
+        for (U solverType : solverTypes) {
+            measurements.clear();
+            IntStream.range(0, cycles).forEach(c -> {
+                T day = dayFactory.apply(solverType);
+                Instant start = Instant.now();
+                assertEquals(expectedResult, solveMethod.apply(day, solverType));
+                Instant finish = Instant.now();
+                measurements.add(Duration.between(start, finish));
+            });
+            measurements.sort(Comparator.naturalOrder());
+            IntStream.range(0, cycleDiscardWorstOutliers).forEach(c -> measurements.removeLast());
+            Duration sum = Duration.ZERO, min = Duration.ofSeconds(Long.MAX_VALUE, 999_999_999), max = Duration.ofSeconds(Long.MIN_VALUE, 999_999_999);
+            for (int i = 0; i < measurements.size(); i++) {
+                Duration measurement = measurements.get(i);
+                sum = sum.plus(measurement);
+                if (min.compareTo(measurement) > 0) {
+                    min = measurement;
+                }
+                if (max.compareTo(measurement) < 0) {
+                    max = measurement;
+                }
+            }
+            Duration avg = sum.dividedBy(measurements.size());
+            System.out.printf("### %-15s elapsed for solver \"%s\"%n", avg.toString(), solverType);
+            System.out.printf("###     min %-15s max %-15s%n", min.toString(), max.toString());
         }
     }
 

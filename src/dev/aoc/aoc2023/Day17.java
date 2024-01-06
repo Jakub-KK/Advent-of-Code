@@ -16,7 +16,6 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@Benchmark(run = false, cycles = 10, inputSuffix = "_test_blackhole_loopy_202x202", partNumber = 1, solutionName = "A*")
 public class Day17 extends Day {
     public Day17(String inputSuffix) {
         super(inputSuffix);
@@ -39,12 +38,15 @@ public class Day17 extends Day {
         parse();
     }
 
+    /**
+     * The consensus on AoC reddit is to use Dijkstra's/A* algorithm, for short and fast programs see https://old.reddit.com/r/adventofcode/comments/18k9ne5/2023_day_17_solutions/?sort=old
+     * Instead, for 3 days, the different solution was created with sweat and blood...
+     * Similar probably to dynamic programming, using brute-force and memoization
+     * Builds from the target node walking through grid diagonals towards start node
+     * It is not general though, it fails for meandering paths (see _test_blackhole_loopy_ family)
+     */
     @SolutionSolver(partNumber = 1, solutionName = "JKK bottom-up")
     public Object solvePart1_JKK() {
-        // the consensus on AoC reddit is to use Dijkstra's algorithm, for short and fast programs see https://old.reddit.com/r/adventofcode/comments/18k9ne5/2023_day_17_solutions/?sort=old
-        // instead, for 3 days, the different solution was created with sweat and blood...
-        // similar probably to dynamic programming, using brute-force and memoization
-        // builds from the target node walking through grid diagonals towards start node
         return solve(SolverType.JKK_BOTTOMUP, 1, 3);
     }
 
@@ -73,7 +75,7 @@ public class Day17 extends Day {
         Function<String, Integer> parser = Integer::parseInt;
         if (this.getInputSuffix().contains("_blackhole_")) parser = CityGrid::parserBlackhole;
         cityGrid = new CityGrid(mapStrings, "", parser, Integer.class);
-        System.out.printf("city grid %d x %d, hash %d%n", cityGrid.getWidth(), cityGrid.getHeight(), cityGrid.hashCode());
+        // System.out.printf("city grid %d x %d, hash %d%n", cityGrid.getWidth(), cityGrid.getHeight(), cityGrid.hashCode());
         // System.out.println(cityGrid);
     }
 
@@ -890,6 +892,10 @@ public class Day17 extends Day {
                 @Test void test_test_directionmatters_ASTAR() { solvePart1(SolverType.ASTAR, 9L, "_test_directionmatters"); }
             }
             @Nested
+            class Day17Test_Cases_test_blackhole_loopy_202x202 {
+                @Test void test_test_blackhole_loopy_202x202_ASTAR() { solvePart1(SolverType.ASTAR, 13518L, "_test_blackhole_loopy_202x202"); }
+            }
+            @Nested
             class Day17Test_Cases_test_blackhole_loopy_7x7_harder {
                 @Test void test_test_blackhole_loopy_7x7_harder_JKK() { solvePart1(SolverType.JKK_BOTTOMUP, 28L, "_test_blackhole_loopy_7x7_harder"); }
                 @Test void test_test_blackhole_loopy_7x7_harder_ASTAR() { solvePart1(SolverType.ASTAR, 28L, "_test_blackhole_loopy_7x7_harder"); }
@@ -935,22 +941,20 @@ public class Day17 extends Day {
     public static class Day17Test_SolverBenchmark {
         @Test
         void test_main() {
-            bench(new SolverType[] { SolverType.JKK_BOTTOMUP, SolverType.ASTAR }, 851L, "", 1, 3);
-            bench(new SolverType[] { SolverType.JKK_BOTTOMUP, SolverType.ASTAR }, 982L, "", 4, 10);
+            benchmark("", 851L, 1, 3);
+            benchmark("", 982L, 4, 10);
         }
-        void bench(SolverType[] solverTypes, long expectedResult, String inputSuffix, int runMinimum, int runMaximum) {
-            Day17 day17 = new Day17(inputSuffix);
-            day17.parse();
-            System.out.printf("### benchmark of \"%s\" with run min %d max %d%n", inputSuffix, runMinimum, runMaximum);
-            for (SolverType solverType : solverTypes) {
-                Instant start = Instant.now();
-                test(solverType, expectedResult, day17, runMinimum, runMaximum);
-                Instant finish = Instant.now();
-                System.out.printf("### %-20s elapsed for solver \"%s\"%n", Duration.between(start, finish).toString(), solverType);
-            }
-        }
-        void test(SolverType solverType, long expectedResult, Day17 day17, int runMinimum, int runMaximum) {
-            assertEquals(expectedResult, day17.solve(solverType, runMinimum, runMaximum));
+        void benchmark(String inputSuffix, Object expectedResult, int runMinimum, int runMaximum) {
+            Day.benchmark(20, expectedResult, inputSuffix,
+                    List.of(SolverType.JKK_BOTTOMUP, SolverType.ASTAR),
+                    (solverType) -> {
+                        Day17 day17 = new Day17(inputSuffix);
+                        day17.parse();
+                        return day17;
+                    },
+                    (day, solverType) -> day.solve(solverType, runMinimum, runMaximum),
+                    "run min %d max %d".formatted(runMinimum, runMaximum)
+            );
         }
     }
 }
