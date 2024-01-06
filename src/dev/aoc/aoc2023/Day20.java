@@ -1,13 +1,16 @@
 package dev.aoc.aoc2023;
 
+import dev.aoc.common.AoCUtil;
 import dev.aoc.common.Day;
 import dev.aoc.common.SolutionParser;
 import dev.aoc.common.SolutionSolver;
 import org.junit.jupiter.api.Test;
 
-import java.nio.FloatBuffer;
+import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -17,10 +20,24 @@ public class Day20 extends Day {
     }
 
     public static void main(String[] args) {
-        Day.run(() -> new Day20("_main_test"));
+        if (false) graphviz("");
+        Day.run(() -> new Day20("_test_counter_2"));
         // _sample_const, _sample_period
-        // _main_test
-        // _test_periodic_1
+        // _main_test - isolated one subcircuit
+        // _test_counter_1, _test_counter_2
+    }
+
+    /** Create graph using command: z:\bin\graphviz\dot -Tsvg -o OUTPUT INPUT */
+    private static void graphviz(String inputSuffix) {
+        Day20 day = new Day20(inputSuffix);
+        day.parse();
+        day.createTestFile(inputSuffix + ".dot", writer -> {
+            try {
+                writer.append(day.signalProcessor.toStringGrahpviz());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     private static abstract class Module {
@@ -39,6 +56,10 @@ public class Day20 extends Day {
             return name;
         }
 
+        public Iterable<String> getSources() {
+            return Collections.unmodifiableList(sourceNames);
+        }
+
         public void wireCable(Module destination) {
             destinationNames.add(destination.name);
             destination.wireAccept(this);
@@ -47,18 +68,27 @@ public class Day20 extends Day {
             sourceNames.add(source.name);
         }
 
-        private int receiveCount = 0;
+        private int receiveCount = 0, transmitCount = 0;
 
         public void receive(Signal input, Module source) {
+            receiveCount++;
             Optional<Signal> output = process(input, source);
             output.ifPresent(this::transmit);
-            receiveCount++;
         }
 
         protected abstract Optional<Signal> process(Signal signal, Module source);
 
         protected void transmit(Signal signal) {
+            transmitCount++;
             destinationNames.forEach(dest -> signalProcessor.transmit(this, signal, dest));
+        }
+
+        public String reportState() {
+            return "";
+        }
+
+        public String toStringGraphviz() {
+            return "%s -> {%s};".formatted(name, String.join(",", destinationNames));
         }
 
         @Override
@@ -71,24 +101,22 @@ public class Day20 extends Day {
             super(name, signalProcessor);
         }
 
-        private boolean isBomb;
+        private Signal received;
 
-        public void setBomb(boolean bomb) {
-            isBomb = bomb;
+        @Override
+        public String reportState() {
+            return received == null ? "_" : Character.toString(received.toString().charAt(0));
         }
 
         @Override
         protected Optional<Signal> process(Signal signal, Module source) {
-            if (isBomb && signal == Signal.LOW) {
-                throw new BombExplodedException();
-            }
+            received = signal;
             return Optional.empty();
         }
 
-        public static class BombExplodedException extends RuntimeException {
-            public BombExplodedException() {
-                super("BOOM");
-            }
+        @Override
+        public String toStringGraphviz() {
+            return "%s %s[shape=doublecircle];".formatted(super.toStringGraphviz(), getName());
         }
     }
     private static class Transmitter extends Module {
@@ -96,8 +124,16 @@ public class Day20 extends Day {
             super(name, signalProcessor);
         }
 
+        private Signal received;
+
+        @Override
+        public String reportState() {
+            return Character.toString(received.toString().charAt(0));
+        }
+
         @Override
         public Optional<Signal> process(Signal signal, Module source) {
+            received = signal;
             return Optional.of(signal);
         }
     }
@@ -116,11 +152,21 @@ public class Day20 extends Day {
         public void receive(Signal signal, Module source) {
             throw new IllegalStateException("Button cannot receive signals (received from module %s)".formatted(source.name));
         }
+
+        @Override
+        public String toStringGraphviz() {
+            return "%s %s[shape=circle];".formatted(super.toStringGraphviz(), getName());
+        }
     }
     private static class Broadcaster extends Transmitter {
         public static final String NAME = "broadcaster";
         public Broadcaster(SignalProcessor signalProcessor) {
             super(NAME, signalProcessor);
+        }
+
+        @Override
+        public String toStringGraphviz() {
+            return "%s %s[shape=doubleoctagon];".formatted(super.toStringGraphviz(), getName());
         }
     }
     private static class FlipFlop extends Module {
@@ -143,6 +189,16 @@ public class Day20 extends Day {
             } else {
                 return Optional.empty();
             }
+        }
+
+        @Override
+        public String reportState() {
+            return isOn ? "1" : "0";
+        }
+
+        @Override
+        public String toStringGraphviz() {
+            return "%s %s[shape=diamond];".formatted(super.toStringGraphviz(), getName());
         }
 
         @Override
@@ -172,6 +228,16 @@ public class Day20 extends Day {
             } else {
                 return Optional.of(Signal.HIGH);
             }
+        }
+
+        @Override
+        public String reportState() {
+            return StreamSupport.stream(getSources().spliterator(), false).map(moduleName -> Character.toString(memory.get(moduleName).toString().charAt(0))).collect(Collectors.joining("|"));
+        }
+
+        @Override
+        public String toStringGraphviz() {
+            return "%s %s[shape=%s];".formatted(super.toStringGraphviz(), getName(), memory.size() < 2 ? "invtriangle" : "invhouse");
         }
 
         @Override
@@ -225,6 +291,7 @@ public class Day20 extends Day {
         }
 
         public void propagate() {
+            reportState(null);
             while (!orders.isEmpty()) {
                 SignalOrder order = orders.removeFirst();
                 // System.out.println(order);
@@ -236,7 +303,22 @@ public class Day20 extends Day {
                     throw new IllegalStateException("signal not LOW nor HIGH");
                 }
                 order.dest.receive(order.signal, order.source);
+                reportState(order);
             }
+        }
+
+        private List<String> modulesToReportState;
+        public void report(List<String> modulesToReportState) {
+            this.modulesToReportState = modulesToReportState;
+        }
+        private void reportState(SignalOrder order) {
+            if (modulesToReportState != null && !modulesToReportState.isEmpty()) {
+                System.out.printf("%s (after %s)%n", modulesToReportState.stream().map(moduleName -> moduleByName.get(moduleName).reportState()).collect(Collectors.joining(", ")), order == null ? "_" : order);
+            }
+        }
+
+        public String toStringGrahpviz() {
+            return "digraph G {%nfontname=\"Helvetica,Arial,sans-serif\"%n%s%n}".formatted(moduleByName.values().stream().map(Module::toStringGraphviz).collect(Collectors.joining("\r\n")));
         }
 
         @Override
@@ -288,37 +370,103 @@ public class Day20 extends Day {
 
     @SolutionSolver(partNumber = 2)
     public Object solvePart2() {
-        if (true) return 3929L*4051L*3767L*3823L;
-        // INFO: puzzle input is a circuit consisting of 4 separate parts, each with its own cycle length, easily discovered by looking at puzzle input and using graph visualization like graphviz (see SVG in inputs folder)
-        // TODO: modify Conjunction gate before "rx" Reciver to observe its sources at measure after how many button pushes it pulls HIGH
-        // multiply 4 numbers (or LCM if not prime), get answer
-        // measurements by hand: nt 3929, kx 4051, rc 3767, mg 3823
-        // Circuit info: The cycle length of each input can be easily derived from just the picture - go from the top most flip flop that leads to the nand and take 0 if the flip flop output doesn't lead to nand , 1 if it does (from lsb to msb). (source https://old.reddit.com/r/adventofcode/comments/18mogoy/2023_day_20_visualization_of_the_input_couldnt/ke5tnx0/)
-        // More: Each cluster has 12 flipflop bits. The nand gate reads only some of these. When those are all "on" the other ones are off, so the nand gate sets them to on (so that 12 bits are on) and then sends an extra low pulse to the first bit, which cascades through the other 11 to turn them all off. (source https://old.reddit.com/r/adventofcode/comments/18mypla/2023_day_20_input_data_plot/ke8z4sd/)
+        // Puzzle input is a circuit consisting of 4 separate parts, each with its own cycle length,
+        // easily discovered by looking at puzzle input and using graph visualization like graphviz (see SVG in inputs folder).
+        // Circuit info: the cycle length of each input can be easily derived from just the picture - go
+        // from the top most flip-flop that leads to the NAND and take 0 if the flip flop output doesn't lead to NAND (conjunction gate),
+        // 1 if it does (from LSB to MSB). (source https://old.reddit.com/r/adventofcode/comments/18mogoy/2023_day_20_visualization_of_the_input_couldnt/ke5tnx0/)
+        // More: each cluster has 12 flip-flop bits. The NAND gate reads only some of these. When those are all "on"
+        // the other ones are off, so the NAND gate sets them to on (so that 12 bits are on) and then sends
+        // an extra low pulse to the first bit, which cascades through the other 11 to turn them all off.
+        // (source https://old.reddit.com/r/adventofcode/comments/18mypla/2023_day_20_input_data_plot/ke8z4sd/)
+
+        // get the module ("rx") that must be sent LOW signal - we will find out how many button presses it takes
         Receiver rxModule = (Receiver)signalProcessor.getModule("rx");
-        rxModule.setBomb(true);
-        boolean hasBombExploded = false;
-        long pushCount = 0;
-        try {
-            while (true) {
-                pushCount++;
-                buttonModule.push();
-                signalProcessor.propagate();
-                if (pushCount % 1000000 == 0) {
-                    System.out.printf("#%d%n", pushCount);
-                }
+        // find a single conjunction module feeding "rx" (further referred to as "feeder")
+        String feederName = null;
+        for (String rxModuleSourceName : rxModule.getSources()) {
+            if (feederName != null) {
+                throw new IllegalStateException("rx module must have exactly one source");
             }
-        } catch (Receiver.BombExplodedException e) {
-            hasBombExploded = true;
+            feederName = rxModuleSourceName;
         }
-        long result = pushCount;
-        return hasBombExploded ? result : null;
+        Module feederModule = signalProcessor.getModule(feederName);
+        if (feederModule.getClass() != Conjunction.class) {
+            throw new IllegalStateException("rx parent module \"%s\" must be conjunction".formatted(feederName));
+        }
+        // find all modules that connect to "feeder", for "rx" to receive LOW signal, all those modules must send LOW to "feeder" simultaneously
+        List<Module> feederSourceModules = new ArrayList<>();
+        for (String feederSourceName : feederModule.getSources()) {
+            Module feederSourceModule = signalProcessor.getModule(feederSourceName);
+            if (feederSourceModule.getClass() != Conjunction.class) {
+                throw new IllegalStateException("rx parent module \"%s\" parent module \"%s\" must be conjunction".formatted(feederName, feederSourceName));
+            }
+            feederSourceModules.add(feederSourceModule);
+        }
+        // add tap (receiver reporting HIGH signal) to every feeder source module output
+        int feederSourcesCount = feederSourceModules.size();
+        // Receiver[] tapReceivers = new Receiver[feederSourcesCount];
+        boolean[] tapObservedHighSignals = new boolean[feederSourcesCount];
+        for (int i = 0; i < feederSourcesCount; i++) {
+            Module feederSourceModule = feederSourceModules.get(i);
+            int tapIndex = i;
+            Receiver tapReceiver = new Receiver("tap_%s".formatted(feederSourceModule.getName()), signalProcessor) {
+                @Override
+                protected Optional<Signal> process(Signal signal, Module source) {
+                    if (signal == Signal.HIGH) {
+                        tapObservedHighSignals[tapIndex] = true;
+                    }
+                    return Optional.empty();
+                }
+            };
+            feederSourceModules.get(tapIndex).wireCable(tapReceiver);
+            // tapReceivers[tapIndex] = tapReceiver;
+        }
+        // push the button and watch for tap observations, detect length of cycle between tap reporting HIGH signal, verify that cycles are repeating
+        long[] feederSourceCycleLengths = new long[feederSourcesCount];
+        long pushCount = 0;
+        // signalProcessor.report(List.of("ff0", "ff1", "ff2", "ff3", "ff4", "ff5", "nand", "out", "fan_nand", "rx")); // for _test_counter_1
+        // signalProcessor.report(List.of("Aff0", "Aff1", "Aff2", "Aff3", "Anand", "Aout", "Bff0", "Bff1", "Bff2", "Bff3", "Bnand", "Bout", "fan_nand", "rx")); // for _test_counter_2
+        while (true) {
+            pushCount++;
+            buttonModule.push();
+            // System.out.printf("*** button press %d%n", pushCount);
+            signalProcessor.propagate();
+            long finalPushCount = pushCount;
+            IntStream.range(0, tapObservedHighSignals.length).forEach(tapIdx -> {
+                if (tapObservedHighSignals[tapIdx]) {
+                    if (feederSourceCycleLengths[tapIdx] < 0) {
+                        // if cycle already detected and stored as negative, check current cycle if it has the same length
+                        long currentCycleLength = finalPushCount - (-feederSourceCycleLengths[tapIdx]);
+                        if (-feederSourceCycleLengths[tapIdx] != currentCycleLength) {
+                            throw new IllegalStateException("cycle lengths don't match, for feeder source \"%s\"".formatted(feederSourceModules.get(tapIdx).getName()));
+                        } else {
+                            // cycle length confirmed, change to positive (assumes cycle length will stay the same later)
+                            feederSourceCycleLengths[tapIdx] *= -1;
+                        }
+                    } else if (feederSourceCycleLengths[tapIdx] > 0) {
+                        // this cycle length is detected and confirmed, do nothing
+                    } else {
+                        feederSourceCycleLengths[tapIdx] = -finalPushCount; // hack: for first cycle store negative to later check if cycles are the same
+                    }
+                    tapObservedHighSignals[tapIdx] = false; // wait for the next cycle
+                }
+            });
+            if (IntStream.range(0, feederSourceCycleLengths.length).allMatch(tapIdx -> feederSourceCycleLengths[tapIdx] > 0)) {
+                // all cycles detected and confirmed
+                break;
+            }
+        }
+        // long result = Arrays.stream(feederSourceCycleLengths).reduce(1, (len, acc) -> acc * len); // if we know that cycle length are coprime just multiply
+        long result = Arrays.stream(feederSourceCycleLengths).reduce(AoCUtil::leastCommonMultiple).getAsLong(); // if we don't know, use LCM
+        return result;
     }
 
     private void parse() {
         Map<String, String[]> cablesForModuleByNames = new HashMap<>();
         stream().forEach(line -> {
-            if (line.trim().isEmpty()) {
+            line = line.trim();
+            if (line.isEmpty() || line.charAt(0) == '#') {
                 return;
             }
             String[] moduleStr = line.split(" -> ");

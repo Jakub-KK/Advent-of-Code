@@ -1,0 +1,21 @@
+broadcaster -> Aff0, Bff0
+
+# 4bit counter, 1101b = 11dec
+&Anand -> Aout, Aff0, Aff2
+%Aff0 -> Aff1, Anand
+%Aff1 -> Aff2, Anand
+%Aff2 -> Aff3
+%Aff3 -> Anand
+&Aout -> fan_nand
+
+# 4bit counter, 1011b = 13dec
+&Bnand -> Bout, Bff0, Bff1
+%Bff0 -> Bff1, Bnand
+%Bff1 -> Bff2
+%Bff2 -> Bff3, Bnand
+%Bff3 -> Bnand
+&Bout -> fan_nand
+
+&fan_nand -> rx
+
+# for explanation see _test_counter_1 file

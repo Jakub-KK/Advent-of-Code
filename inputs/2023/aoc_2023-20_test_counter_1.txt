@@ -1,0 +1,22 @@
+broadcaster -> ff0
+
+&nand -> out, ff0, ff1, ff2, ff5
+%ff0 -> ff1, nand
+%ff1 -> ff2
+%ff2 -> ff3
+%ff3 -> ff4, nand
+%ff4 -> ff5, nand
+%ff5 -> ff6
+%ff6 -> nand
+&out -> fan_nand
+
+&fan_nand -> rx
+
+# binary counter:
+# flip-flops "ffN" are state
+# wires from flip-flops to nand are terminal condition
+# wires from nand to flip-flops are reseting flip-flops after condition is reached
+# "out" is for negation
+# fan_nand is for integrating many counters to output to "rx" only when every counter hits the condition
+
+# this particular counter has 6 bits, and terminates when 0,3,4,6 bits is high (which gives a value of 89)
