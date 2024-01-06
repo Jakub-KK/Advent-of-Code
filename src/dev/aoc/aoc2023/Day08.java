@@ -1,6 +1,7 @@
 package dev.aoc.aoc2023;
 
 import com.google.common.collect.Sets;
+import dev.aoc.common.AoCUtil;
 import dev.aoc.common.Day;
 import dev.aoc.common.SolutionParser;
 import dev.aoc.common.SolutionSolver;
@@ -81,7 +82,7 @@ public class Day08 extends Day {
             } while (pathFollower.notEnded());
             return pathFollower.stepsCount();
         }).toArray();
-        long stepsLCM = Arrays.stream(stepsForEachStart).reduce(Day08::leastCommonMultiple).getAsLong();
+        long stepsLCM = Arrays.stream(stepsForEachStart).reduce(AoCUtil::leastCommonMultiple).getAsLong();
         final boolean checkResult = false;
         if (checkResult) {
             Stream<PathFollower> paths = startsForPart2.stream().map(c -> new PathFollower(instructions, map, c, 0, s -> s.endsWith("Z"), null));
@@ -230,20 +231,6 @@ public class Day08 extends Day {
                 visitNode.accept(new State(currNodeName, currStepIdx, map.get(currNodeName)));
             }
         }
-    }
-
-    private static long greatestCommonDivisor(long a, long b) {
-        // Euclidean algorithm
-        while (b != 0) {
-            var temp = b;
-            b = a % b;
-            a = temp;
-        }
-        return a;
-    }
-
-    private static long leastCommonMultiple(long a, long b) {
-        return (a * b / greatestCommonDivisor(a, b));
     }
 
     public static class Day08Test {
