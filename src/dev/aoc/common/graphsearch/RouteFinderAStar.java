@@ -19,16 +19,16 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
 
     protected void foundRoute(List<T> route, long score) {}
 
-    public Pair<List<T>, Long> findRoute(T start, T target) {
-        return findRoute(List.of(start), target);
+    public Pair<List<T>, Long> findRoute(T startNode, T targetNode) {
+        return findRoute(List.of(startNode), targetNode);
     }
 
-    public Pair<List<T>, Long> findRoute(Iterable<T> startNodes, T target) {
+    public Pair<List<T>, Long> findRoute(Iterable<T> startNodes, T targetNode) {
         var openSet = new FibonacciHeap<RouteNodeEstimatedPlusHeapRef<T>, RouteNodeEstimatedPlusHeapRef<T>>(Comparator.naturalOrder());
         Map<T, RouteNodeEstimatedPlusHeapRef<T>> all = new HashMap<>();
 
         for (T startNode : startNodes) {
-            var start = new RouteNodeEstimatedPlusHeapRef<>(startNode, null, 0, targetScorer != null ? targetScorer.computeCost(startNode, target) : 0);
+            var start = new RouteNodeEstimatedPlusHeapRef<>(startNode, null, 0, targetScorer != null ? targetScorer.computeCost(startNode, targetNode) : 0);
             var startHeapEntry = openSet.insert(start, start);
             start.setHeapEntry(startHeapEntry);
             all.put(startNode, start);
@@ -45,7 +45,7 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
             current.setHeapEntry(null); // we don't need heap reference no more as this route node is off the open set
             T currentNode = current.getCurrent();
             // countClosedNodes++;
-            if (currentNode.equalsTarget(target)) {
+            if (currentNode.equalsTarget(targetNode)) {
                 // System.out.printf("score %d%n", current.getRouteScore());
                 List<T> route = new ArrayList<>();
                 RouteNodeEstimated<T> routeNode = current;
@@ -68,7 +68,7 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
                 if (newScore < next.getRouteScore()) {
                     next.setPrevious(current);
                     next.setRouteScore(newScore);
-                    next.setEstimatedScore(newScore + (targetScorer != null ? targetScorer.computeCost(nextNode, target) : 0));
+                    next.setEstimatedScore(newScore + (targetScorer != null ? targetScorer.computeCost(nextNode, targetNode) : 0));
                     var heapEntry = next.getHeapEntry();
                     if (heapEntry != null) {
                         openSet.decreaseKey(heapEntry, next); // decrease key is faster than remove/insert if already part of the open set

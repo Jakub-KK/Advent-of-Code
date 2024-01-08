@@ -392,7 +392,19 @@ public class Day23 extends Day {
     public Object solvePart1() {
         // if (true) return null;
         ForestDirectedGraph forestGraph = new ForestWithSlopesGraph();
-        RouteFinderMax<PathDirectedNode> routeFinder = new RouteFinderMax<>(forestGraph, new NextPathDirectedNodeScorer(), new TargetEstimatePathDirectedNodeScorer());
+        final long[] maxScore = { Long.MIN_VALUE };
+        RouteFinderDFS<PathDirectedNode> routeFinder = new RouteFinderDFS<>(forestGraph, new NextPathDirectedNodeScorer(), new TargetEstimatePathDirectedNodeScorer()) {
+            @Override
+            protected FoundRouteDecision foundRoute(List<PathDirectedNode> route, long score) {
+                if (maxScore[0] < score) {
+                    maxScore[0] = score;
+                    // System.out.printf("found better route, score %d%n", score);
+                    return FoundRouteDecision.REMEMBER;
+                } else {
+                    return FoundRouteDecision.IGNORE;
+                }
+            }
+        };
         Pair<List<PathDirectedNode>, Long> routeWithScore = routeFinder.findRoute(forestGraph.start, forestGraph.end);
         long result = routeWithScore.getValue1();
         return result;
@@ -409,28 +421,28 @@ public class Day23 extends Day {
         // find all crossings, use search from part 1 to iterate through all paths and create graph with nodes in crossings (plus start/end) and edges with weight of longest corridor between crossings
         ForestGraph forestWithoutSlopesGraph = new ForestWithoutSlopesGraph();
         Grid<Integer> forestConnDegree = forestGrid.map((coords, symbol) -> symbol == '#' ? 0 : forestWithoutSlopesGraph.getEdges(new PathDirectedNode(coords.getValue0(), coords.getValue1(), Direction.UNKNOWN)).size(), Integer.valueOf(0).getClass());
-        Map<PathNode, PathNode> crossNodes = new HashMap<>();
-        crossNodes.put(forestWithoutSlopesGraph.start, forestWithoutSlopesGraph.start);
-        crossNodes.put(forestWithoutSlopesGraph.end, forestWithoutSlopesGraph.end);
+        Set<PathNode> crossNodes = new HashSet<>();
+        crossNodes.add(forestWithoutSlopesGraph.start);
+        crossNodes.add(forestWithoutSlopesGraph.end);
         forestConnDegree.forEach((coords, degree) -> {
             if (degree > 2) {
                 PathNode node = new PathNode(coords.getValue0(), coords.getValue1());
-                crossNodes.put(node, node);
+                crossNodes.add(node);
             }
         });
         Map<Pair<PathNode, PathNode>, Integer> crossNodeDistances = new HashMap<>();
         ForestDirectedGraph forestWithSlopesGraph = new ForestWithSlopesGraph();
         // Grid<Character> routeHitMap = forestGrid.getClone();
-        RouteFinderMax<PathDirectedNode> routeFinder = new RouteFinderMax<>(forestWithSlopesGraph, new NextPathDirectedNodeScorer(), new TargetEstimatePathDirectedNodeScorer()) {
+        RouteFinderDFS<PathDirectedNode> routeFinder = new RouteFinderDFS<>(forestWithSlopesGraph, new NextPathDirectedNodeScorer(), new TargetEstimatePathDirectedNodeScorer()) {
             @Override
-            protected void foundRoute(List<PathDirectedNode> routeDirected, long score) {
+            protected FoundRouteDecision foundRoute(List<PathDirectedNode> routeDirected, long score) {
                 List<PathNode> route = routeDirected.stream().map(pdn -> new PathNode(pdn.col, pdn.row)).toList();
                 int firstIdx = 0;
                 PathNode firstNode = route.get(firstIdx);
                 for (int secondIdx = firstIdx + 1; secondIdx < route.size(); secondIdx++) {
                     PathNode secondNode = route.get(secondIdx);
                     // routeHitMap.set(secondNode.col, secondNode.row, 'O');
-                    if (!crossNodes.containsKey(secondNode)) {
+                    if (!crossNodes.contains(secondNode)) {
                         continue;
                     }
                     boolean isOrdered = firstNode.getId() < secondNode.getId();
@@ -440,14 +452,35 @@ public class Day23 extends Day {
                     firstIdx = secondIdx;
                     firstNode = secondNode;
                 }
+                return FoundRouteDecision.IGNORE; // doesn't matter
             }
         };
         routeFinder.findRoute(forestWithSlopesGraph.start, forestWithSlopesGraph.end);
         // System.out.println(routeHitMap);
-        CrossingsGraph crossingsGraph = new CrossingsGraph(crossNodes.keySet(), crossNodeDistances);
-        RouteFinderMax<PathNode> crossingsRouteFinder = new RouteFinderMax<>(crossingsGraph, new NextCrossingsPathNodeScorer(crossingsGraph), new TargetEstimateCrossingsPathNodeScorer());
-        Pair<List<PathNode>, Long> routeWithScore = crossingsRouteFinder.findRoute(crossingsGraph.start, crossingsGraph.end);
+        CrossingsGraph crossingsGraph = new CrossingsGraph(crossNodes, crossNodeDistances);
+        // optimize search: exploit the knowledge that to end node leads only one path from last crossing
+        Set<PathNode> endNodeEdges = crossingsGraph.getEdges(crossingsGraph.end);
+        if (endNodeEdges.size() != 1) {
+            throw new IllegalStateException("multiple ways to end point not supported");
+        }
+        PathNode penultimateToEndNode = endNodeEdges.stream().toList().get(0);
+        final long[] maxScore = { Long.MIN_VALUE };
+        RouteFinderDFS<PathNode> crossingsRouteFinder = new RouteFinderDFS<>(crossingsGraph, new NextCrossingsPathNodeScorer(crossingsGraph)) {
+            @Override
+            protected FoundRouteDecision foundRoute(List<PathNode> route, long score) {
+                if (maxScore[0] < score) {
+                    maxScore[0] = score;
+                    // System.out.printf("found better route, score %d%n", score);
+                    return FoundRouteDecision.REMEMBER;
+                } else {
+                    return FoundRouteDecision.IGNORE;
+                }
+            }
+        };
+        Pair<List<PathNode>, Long> routeWithScore = crossingsRouteFinder.findRoute(crossingsGraph.start, penultimateToEndNode);
         long result = routeWithScore.getValue1();
+        // add length of stretch from last crossing to end node
+        result += crossNodeDistances.get(new Pair<>(penultimateToEndNode, crossingsGraph.end));
         return result;
     }
 
@@ -478,6 +511,24 @@ public class Day23 extends Day {
             var day = new Day23("");
             day.parsePart2();
             assertEquals(6646L, day.solvePart2());
+        }
+    }
+    public static class Day23Test_Benchmark {
+        @Test
+        void test_main() {
+            benchmark("", 6646L);
+        }
+        void benchmark(String inputSuffix, Object expectedResult) {
+            Day.benchmark(5, expectedResult, inputSuffix,
+                    List.of("dummy"),
+                    (solverType) -> {
+                        Day23 day17 = new Day23(inputSuffix);
+                        day17.parse();
+                        return day17;
+                    },
+                    (day, solverType) -> day.solvePart2(),
+                    ""
+            );
         }
     }
 }
