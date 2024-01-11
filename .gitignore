@@ -33,3 +33,6 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+# extra files associated with project, not to be commited to repo
+_extra/
