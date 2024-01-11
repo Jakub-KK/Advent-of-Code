@@ -395,7 +395,7 @@ public class Day23 extends Day {
         final long[] maxScore = { Long.MIN_VALUE };
         RouteFinderDFS<PathDirectedNode> routeFinder = new RouteFinderDFS<>(forestGraph, new NextPathDirectedNodeScorer(), new TargetEstimatePathDirectedNodeScorer()) {
             @Override
-            protected FoundRouteDecision foundRoute(List<PathDirectedNode> route, long score) {
+            public FoundRouteDecision foundRoute(List<PathDirectedNode> route, long score) {
                 if (maxScore[0] < score) {
                     maxScore[0] = score;
                     // System.out.printf("found better route, score %d%n", score);
@@ -435,7 +435,7 @@ public class Day23 extends Day {
         // Grid<Character> routeHitMap = forestGrid.getClone();
         RouteFinderDFS<PathDirectedNode> routeFinder = new RouteFinderDFS<>(forestWithSlopesGraph, new NextPathDirectedNodeScorer(), new TargetEstimatePathDirectedNodeScorer()) {
             @Override
-            protected FoundRouteDecision foundRoute(List<PathDirectedNode> routeDirected, long score) {
+            public FoundRouteDecision foundRoute(List<PathDirectedNode> routeDirected, long score) {
                 List<PathNode> route = routeDirected.stream().map(pdn -> new PathNode(pdn.col, pdn.row)).toList();
                 int firstIdx = 0;
                 PathNode firstNode = route.get(firstIdx);
@@ -467,7 +467,7 @@ public class Day23 extends Day {
         final long[] maxScore = { Long.MIN_VALUE };
         RouteFinderDFS<PathNode> crossingsRouteFinder = new RouteFinderDFS<>(crossingsGraph, new NextCrossingsPathNodeScorer(crossingsGraph)) {
             @Override
-            protected FoundRouteDecision foundRoute(List<PathNode> route, long score) {
+            public FoundRouteDecision foundRoute(List<PathNode> route, long score) {
                 if (maxScore[0] < score) {
                     maxScore[0] = score;
                     // System.out.printf("found better route, score %d%n", score);

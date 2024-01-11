@@ -8,4 +8,7 @@ import java.util.function.Predicate;
 public interface RouteFinder<T extends GraphNode> {
     Pair<List<T>, Long> findRoute(T startNode, T targetNode);
     Pair<List<T>, Long> findRoute(Iterable<T> startNodes, T targetNode);
+
+    enum FoundRouteDecision { REMEMBER, IGNORE, ABORT_SEARCH;}
+    FoundRouteDecision foundRoute(List<T> route, long score);
 }

@@ -17,12 +17,13 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
         this.targetScorer = targetScorer;
     }
 
-    protected void foundRoute(List<T> route, long score) {}
+    public FoundRouteDecision foundRoute(List<T> route, long score) {
+        return FoundRouteDecision.ABORT_SEARCH; // abort search as soon as the first route is found
+    }
 
     public Pair<List<T>, Long> findRoute(T startNode, T targetNode) {
         return findRoute(List.of(startNode), targetNode);
     }
-
     public Pair<List<T>, Long> findRoute(Iterable<T> startNodes, T targetNode) {
         var openSet = new FibonacciHeap<RouteNodeEstimatedPlusHeapRef<T>, RouteNodeEstimatedPlusHeapRef<T>>(Comparator.naturalOrder());
         Map<T, RouteNodeEstimatedPlusHeapRef<T>> all = new HashMap<>();
@@ -34,8 +35,8 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
             all.put(startNode, start);
         }
 
-        // List<T> minRoute = null;
-        // long minScore = Long.MAX_VALUE;
+        List<T> foundRoute = null;
+        long foundScore = Long.MAX_VALUE;
         // int maxOpenSetCount = openSet.getSize();
         // int countClosedNodes = 0;
 
@@ -44,6 +45,7 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
             RouteNodeEstimatedPlusHeapRef<T> current = openSet.extractMinimum().getValue();
             current.setHeapEntry(null); // we don't need heap reference no more as this route node is off the open set
             T currentNode = current.getCurrent();
+            long currentRouteScore = current.getRouteScore();
             // countClosedNodes++;
             if (currentNode.equalsTarget(targetNode)) {
                 // System.out.printf("score %d%n", current.getRouteScore());
@@ -53,12 +55,19 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
                     route.addFirst(routeNode.getCurrent());
                     routeNode = routeNode.getPrevious();
                 } while (routeNode != null);
-                return new Pair<>(route, current.getRouteScore());
+                FoundRouteDecision decision = foundRoute(route, currentRouteScore);
+                if (decision != FoundRouteDecision.IGNORE) {
+                    foundScore = currentRouteScore;
+                    foundRoute = route;
+                    if (decision == FoundRouteDecision.ABORT_SEARCH) {
+                        break;
+                    }
+                }
                 // foundRoute(route, current.getRouteScore());
-                // if (minScore > current.getRouteScore()) {
-                //     minScore = current.getRouteScore();
-                //     // System.out.printf("found better route, score %d%n", minScore);
-                //     minRoute = route;
+                // if (foundScore > current.getRouteScore()) {
+                //     foundScore = current.getRouteScore();
+                //     // System.out.printf("found better route, score %d%n", foundScore);
+                //     foundRoute = route;
                 // }
             }
 
@@ -83,11 +92,11 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
             // }
         }
 
-        throw new IllegalStateException("no route found");
-        // if (minRoute == null) {
+        // throw new IllegalStateException("no route found");
+        // if (foundRoute == null) {
         //     throw new IllegalStateException("no route found");
         // }
-        // return new Pair<>(minRoute, minScore);
+        return foundRoute != null ? new Pair<>(foundRoute, foundScore) : null;
     }
 
     /** This code is left for benchmark/comparison, it uses Java standard PriorityQueue.
@@ -102,13 +111,14 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
             all.put(startNode, start);
         }
 
-        // List<T> minRoute = null;
-        // long minScore = Long.MAX_VALUE;
+        List<T> foundRoute = null;
+        long foundScore = Long.MAX_VALUE;
 
         while (!openSet.isEmpty()) {
             // System.out.printf("routing: open %d%n", openSet.size());
             RouteNodeEstimated<T> current = openSet.poll();
             T currentNode = current.getCurrent();
+            long currentRouteScore = current.getRouteScore();
             if (currentNode.equalsTarget(target)) {
                 // System.out.printf("score %d%n", current.getRouteScore());
                 List<T> route = new ArrayList<>();
@@ -117,12 +127,19 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
                     route.addFirst(routeNode.getCurrent());
                     routeNode = routeNode.getPrevious();
                 } while (routeNode != null);
-                return new Pair<>(route, current.getRouteScore());
+                FoundRouteDecision decision = foundRoute(route, currentRouteScore);
+                if (decision != FoundRouteDecision.IGNORE) {
+                    foundScore = currentRouteScore;
+                    foundRoute = route;
+                    if (decision == FoundRouteDecision.ABORT_SEARCH) {
+                        break;
+                    }
+                }
                 // foundRoute(route, current.getRouteScore());
-                // if (minScore > current.getRouteScore()) {
-                //     minScore = current.getRouteScore();
-                //     // System.out.printf("found better route, score %d%n", minScore);
-                //     minRoute = route;
+                // if (foundScore > current.getRouteScore()) {
+                //     foundScore = current.getRouteScore();
+                //     // System.out.printf("found better route, score %d%n", foundScore);
+                //     foundRoute = route;
                 // }
             }
 
@@ -146,10 +163,9 @@ public class RouteFinderAStar<T extends GraphNode> implements RouteFinder<T> {
             }
         }
 
-        throw new IllegalStateException("no route found");
-        // if (minRoute == null) {
+        // if (foundRoute == null) {
         //     throw new IllegalStateException("no route found");
         // }
-        // return new Pair<>(minRoute, minScore);
+        return foundRoute != null ? new Pair<>(foundRoute, foundScore) : null;
     }
 }

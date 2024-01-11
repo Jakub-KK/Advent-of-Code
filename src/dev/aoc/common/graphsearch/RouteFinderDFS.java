@@ -45,10 +45,9 @@ public class RouteFinderDFS<T extends GraphNode> implements RouteFinder<T> {
         return new State<>(current, nexts);
     }
 
-    protected enum FoundRouteDecision { REMEMBER, IGNORE, ABORT_SEARCH };
-
-    protected FoundRouteDecision foundRoute(List<T> route, long score) {
-        return FoundRouteDecision.IGNORE;
+    @Override
+    public FoundRouteDecision foundRoute(List<T> route, long score) {
+        return FoundRouteDecision.IGNORE; // ignore every found route, search exhaustively to the end
     }
 
     public Pair<List<T>, Long> findRoute(T startNode, T targetNode) {
@@ -81,11 +80,12 @@ public class RouteFinderDFS<T extends GraphNode> implements RouteFinder<T> {
                     routeNode = routeNode.getPrevious();
                 } while (routeNode != null);
                 FoundRouteDecision decision = foundRoute(route, currentRouteScore);
-                if (decision == FoundRouteDecision.REMEMBER) {
+                if (decision != FoundRouteDecision.IGNORE) {
                     foundScore = currentRouteScore;
                     foundRoute = route;
-                } else if (decision == FoundRouteDecision.ABORT_SEARCH) {
-                    break;
+                    if (decision == FoundRouteDecision.ABORT_SEARCH) {
+                        break;
+                    }
                 }
                 lastState.nexts.clear();
             }
